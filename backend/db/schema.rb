@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_04_26_214000) do
+ActiveRecord::Schema[8.0].define(version: 2026_04_26_233000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -51,6 +51,22 @@ ActiveRecord::Schema[8.0].define(version: 2026_04_26_214000) do
     t.check_constraint "running_balance >= 0", name: "chk_user_point_transactions_running_balance_non_negative"
   end
 
+  create_table "user_redemptions", comment: "Reward redemption records for users", force: :cascade do |t|
+    t.bigint "user_id", null: false, comment: "User who redeemed the reward"
+    t.bigint "reward_id", null: false, comment: "Reward that was redeemed"
+    t.integer "points_cost_snapshot", null: false, comment: "Points cost at redemption time"
+    t.string "status", default: "completed", null: false, comment: "Redemption status"
+    t.string "idempotency_key", null: false, comment: "Idempotency key for duplicate request protection"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["reward_id"], name: "index_user_redemptions_on_reward_id"
+    t.index ["user_id", "created_at", "id"], name: "index_user_redemptions_on_user_id_and_created_at_and_id"
+    t.index ["user_id", "idempotency_key"], name: "index_user_redemptions_on_user_id_and_idempotency_key", unique: true
+    t.index ["user_id"], name: "index_user_redemptions_on_user_id"
+    t.check_constraint "points_cost_snapshot >= 0", name: "chk_redemptions_points_cost_snapshot_non_negative"
+    t.check_constraint "status::text = ANY (ARRAY['completed'::character varying, 'failed'::character varying, 'cancelled'::character varying]::text[])", name: "chk_redemptions_status_valid"
+  end
+
   create_table "users", force: :cascade do |t|
     t.string "email", default: "", null: false
     t.string "encrypted_password", default: "", null: false
@@ -64,4 +80,6 @@ ActiveRecord::Schema[8.0].define(version: 2026_04_26_214000) do
   end
 
   add_foreign_key "user_point_transactions", "users"
+  add_foreign_key "user_redemptions", "rewards"
+  add_foreign_key "user_redemptions", "users"
 end

@@ -8,4 +8,8 @@ class User < ApplicationRecord
            class_name: "User::PointTransaction",
            inverse_of: :user,
            dependent: :destroy
+  has_many :redemptions,
+           class_name: "User::Redemption",
+           inverse_of: :user,
+           dependent: :destroy
 end

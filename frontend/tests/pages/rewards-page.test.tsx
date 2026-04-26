@@ -5,11 +5,20 @@ import RewardsPage from "@/app/rewards/page";
 
 const replaceMock = vi.fn();
 const fetchRewardsMock = vi.fn();
+const redeemRewardMock = vi.fn();
+const setUserMock = vi.fn((nextUser: { id: number; email: string; points_balance?: number }) => {
+  authState = { ...authState, user: nextUser };
+});
 const routerMock = { replace: replaceMock };
 
-let authState: { user: { id: number; email: string; points_balance?: number } | null; loading: boolean } = {
+let authState: {
+  user: { id: number; email: string; points_balance?: number } | null;
+  loading: boolean;
+  setUser: (nextUser: { id: number; email: string; points_balance?: number }) => void;
+} = {
   user: { id: 1, email: "demo@example.com", points_balance: 690 },
   loading: false,
+  setUser: setUserMock,
 };
 
 vi.mock("next/navigation", () => ({
@@ -22,6 +31,7 @@ vi.mock("@/lib/auth-context", () => ({
 
 vi.mock("@/services/api", () => ({
   fetchRewards: (...args: unknown[]) => fetchRewardsMock(...args),
+  redeemReward: (...args: unknown[]) => redeemRewardMock(...args),
 }));
 
 vi.mock("@/components/Navbar", () => ({
@@ -34,7 +44,17 @@ describe("RewardsPage", () => {
     authState = {
       user: { id: 1, email: "demo@example.com", points_balance: 690 },
       loading: false,
+      setUser: setUserMock,
     };
+    redeemRewardMock.mockResolvedValue({
+      data: {
+        id: 123,
+        reward_id: 1,
+        points_cost_snapshot: 100,
+        status: "completed",
+        points_balance: 590,
+      },
+    });
     fetchRewardsMock.mockResolvedValue({
       data: [
         {
@@ -51,7 +71,7 @@ describe("RewardsPage", () => {
   });
 
   it("redirects to login when user is not authenticated", async () => {
-    authState = { user: null, loading: false };
+    authState = { user: null, loading: false, setUser: setUserMock };
 
     render(<RewardsPage />);
 
@@ -192,6 +212,77 @@ describe("RewardsPage", () => {
 
     await waitFor(() => {
       expect(fetchRewardsMock).toHaveBeenLastCalledWith({ query: "vip", page: 1, perPage: 6 });
+    });
+  });
+
+  it("shows a confirmation modal and redeems after confirm", async () => {
+    const user = userEvent.setup();
+    render(<RewardsPage />);
+
+    expect(await screen.findByText("Free Coffee")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Redeem" }));
+    expect(screen.getByText("Use points for this reward?")).toBeInTheDocument();
+    expect(redeemRewardMock).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "Confirm redeem" }));
+
+    expect(await screen.findByText("Thanks, you are all set.")).toBeInTheDocument();
+    expect(screen.getByText(/You redeemed/)).toBeInTheDocument();
+    expect(screen.getByText(/new balance is/)).toBeInTheDocument();
+    expect(redeemRewardMock).toHaveBeenCalledWith(1);
+    expect(setUserMock).toHaveBeenCalledWith({
+      id: 1,
+      email: "demo@example.com",
+      points_balance: 590,
+    });
+  });
+
+  it("closes confirmation modal without redeeming when cancelled", async () => {
+    const user = userEvent.setup();
+    render(<RewardsPage />);
+
+    expect(await screen.findByText("Free Coffee")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Redeem" }));
+    expect(screen.getByText("Use points for this reward?")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+    await waitFor(() => {
+      expect(screen.queryByText("Use points for this reward?")).not.toBeInTheDocument();
+    });
+    expect(redeemRewardMock).not.toHaveBeenCalled();
+  });
+
+  it("shows redeem error message when confirmation request fails", async () => {
+    redeemRewardMock.mockRejectedValueOnce(new Error("Reward is not available for redemption"));
+
+    const user = userEvent.setup();
+    render(<RewardsPage />);
+
+    expect(await screen.findByText("Free Coffee")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Redeem" }));
+    await user.click(screen.getByRole("button", { name: "Confirm redeem" }));
+
+    expect(await screen.findByText("Reward is not available for redemption")).toBeInTheDocument();
+    expect(screen.queryByText("Thanks, you are all set.")).not.toBeInTheDocument();
+  });
+
+  it("dismisses success confirmation banner", async () => {
+    const user = userEvent.setup();
+    render(<RewardsPage />);
+
+    expect(await screen.findByText("Free Coffee")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Redeem" }));
+    await user.click(screen.getByRole("button", { name: "Confirm redeem" }));
+
+    expect(await screen.findByText("Thanks, you are all set.")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Dismiss" }));
+
+    await waitFor(() => {
+      expect(screen.queryByText("Thanks, you are all set.")).not.toBeInTheDocument();
     });
   });
 });

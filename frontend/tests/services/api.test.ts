@@ -48,6 +48,18 @@ describe("services/api", () => {
     await expect(getCurrentUser()).rejects.toThrow("Not authenticated");
   });
 
+  it("uses nested backend error.message when error is an object", async () => {
+    const { redeemReward } = await import("@/services/api");
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      headers: { get: () => "application/json" },
+      json: async () => ({ error: { code: "insufficient_balance", message: "Insufficient points balance" } }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(redeemReward(1)).rejects.toThrow("Insufficient points balance");
+  });
+
   it("uses expected path for user points endpoint", async () => {
     const { getUserPoints } = await import("@/services/api");
     const fetchMock = vi.fn().mockResolvedValue({
@@ -88,6 +100,30 @@ describe("services/api", () => {
       2,
       "http://localhost:3001/users/sign_out",
       expect.objectContaining({ method: "DELETE" })
+    );
+  });
+
+  it("uses user-scoped redemptions endpoint", async () => {
+    const { redeemReward } = await import("@/services/api");
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      headers: { get: () => "application/json" },
+      json: async () => ({ data: { id: 1, reward_id: 2, points_cost_snapshot: 100, status: "completed", points_balance: 500 } }),
+      text: async () =>
+        JSON.stringify({
+          data: { id: 1, reward_id: 2, points_cost_snapshot: 100, status: "completed", points_balance: 500 },
+        }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await redeemReward(2);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:3001/api/v1/user/redemptions",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ redemption: { reward_id: 2 } }),
+      })
     );
   });
 });

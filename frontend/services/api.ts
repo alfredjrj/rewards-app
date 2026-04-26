@@ -25,6 +25,16 @@ export interface Reward {
   is_available: boolean;
 }
 
+export interface RedemptionResponse {
+  data: {
+    id: number;
+    reward_id: number;
+    points_cost_snapshot: number;
+    status: string;
+    points_balance: number;
+  };
+}
+
 export interface PaginatedResponse<T> {
   data: T[];
   meta: {
@@ -39,6 +49,43 @@ export interface FetchRewardsOptions {
   query?: string;
   page?: number;
   perPage?: number;
+}
+
+function parseErrorMessage(data: unknown): string {
+  if (!data || typeof data !== "object") return "Request failed";
+
+  const payload = data as {
+    error?: string | { message?: string };
+    errors?: Array<string | { message?: string }>;
+  };
+
+  if (typeof payload.error === "string" && payload.error.trim()) {
+    return payload.error;
+  }
+
+  if (
+    payload.error &&
+    typeof payload.error === "object" &&
+    typeof payload.error.message === "string" &&
+    payload.error.message.trim()
+  ) {
+    return payload.error.message;
+  }
+
+  const firstError = payload.errors?.[0];
+  if (typeof firstError === "string" && firstError.trim()) {
+    return firstError;
+  }
+  if (
+    firstError &&
+    typeof firstError === "object" &&
+    typeof firstError.message === "string" &&
+    firstError.message.trim()
+  ) {
+    return firstError.message;
+  }
+
+  return "Request failed";
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -71,7 +118,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
-    throw new Error(data.error || data.errors?.[0] || "Request failed");
+    throw new Error(parseErrorMessage(data));
   }
 
   if (res.status === 204) {
@@ -137,5 +184,20 @@ export async function fetchRewards(
 
   const queryString = params.toString() ? `?${params.toString()}` : "";
   return request<PaginatedResponse<Reward>>(`/api/v1/rewards${queryString}`);
+}
+
+export async function redeemReward(rewardId: number): Promise<RedemptionResponse> {
+  const key =
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random()}`;
+
+  return request("/api/v1/user/redemptions", {
+    method: "POST",
+    body: JSON.stringify({ redemption: { reward_id: rewardId } }),
+    headers: {
+      "Idempotency-Key": key,
+    },
+  });
 }
 
