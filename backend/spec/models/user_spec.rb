@@ -1,6 +1,16 @@
 require "rails_helper"
 
 RSpec.describe User, type: :model do
+  describe "associations" do
+    it "has many point transactions" do
+      user = create(:user)
+      create(:user_point_transaction, user: user)
+
+      expect(user.point_transactions.count).to eq(1)
+      expect(user.point_transactions.first).to be_a(User::PointTransaction)
+    end
+  end
+
   describe "validations" do
     it "is valid with factory defaults" do
       expect(build(:user)).to be_valid

@@ -29,7 +29,7 @@ RSpec.describe RewardPolicy do
       it "returns only available rewards ordered by title" do
         result = described_class::Scope.new(user, Reward).resolve
 
-        expect(result).to eq([available_reward])
+        expect(result).to eq([ available_reward ])
       end
     end
 

@@ -4,6 +4,22 @@ user = User.find_or_create_by!(email: "demo@example.com") do |u|
 end
 puts "User created: #{user.email}"
 
+point_transactions_seed = [
+  { amount: 500, kind: "earn", reason_code: "signup_bonus", reason: "Initial signup reward", idempotency_key: "seed-signup-bonus" },
+  { amount: 250, kind: "earn", reason_code: "purchase", reason: "Points earned from first purchase", idempotency_key: "seed-first-purchase" },
+  { amount: -100, kind: "redeem", reason_code: "reward_redemption", reason: "Redeemed Free Coffee", idempotency_key: "seed-redeem-coffee" },
+  { amount: 120, kind: "earn", reason_code: "referral_bonus", reason: "Referral reward", idempotency_key: "seed-referral-bonus" },
+  { amount: -80, kind: "expiry", reason_code: "expiry", reason: "Monthly point expiry adjustment", idempotency_key: "seed-monthly-expiry" }
+]
+
+running_balance = 0
+point_transactions_seed.each do |attrs|
+  running_balance += attrs[:amount]
+  tx = User::PointTransaction.find_or_initialize_by(user: user, idempotency_key: attrs[:idempotency_key])
+  tx.update!(attrs.merge(running_balance: running_balance))
+  puts "Point transaction seeded: #{tx.kind} #{tx.amount} (balance: #{tx.running_balance})"
+end
+
 rewards_data = [
   {
     title: "Free Coffee",

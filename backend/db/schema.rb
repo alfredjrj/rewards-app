@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_04_26_201000) do
+ActiveRecord::Schema[8.0].define(version: 2026_04_26_214000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -29,6 +29,28 @@ ActiveRecord::Schema[8.0].define(version: 2026_04_26_201000) do
     t.check_constraint "points_cost >= 0", name: "chk_rewards_points_cost_non_negative"
   end
 
+  create_table "user_point_transactions", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.integer "amount", null: false
+    t.integer "running_balance", null: false
+    t.string "kind", null: false
+    t.string "source_type"
+    t.bigint "source_id"
+    t.string "idempotency_key", null: false
+    t.string "reason"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.string "reason_code", null: false, comment: "Structured reason code for reporting and audits"
+    t.index ["source_type", "source_id"], name: "index_user_point_transactions_on_source"
+    t.index ["user_id", "created_at", "id"], name: "index_user_point_transactions_on_user_id_and_created_at_and_id"
+    t.index ["user_id", "idempotency_key"], name: "index_user_point_transactions_on_user_id_and_idempotency_key", unique: true
+    t.index ["user_id"], name: "index_user_point_transactions_on_user_id"
+    t.check_constraint "amount <> 0", name: "chk_user_point_transactions_amount_non_zero"
+    t.check_constraint "kind::text = ANY (ARRAY['earn'::character varying, 'redeem'::character varying, 'adjustment'::character varying, 'expiry'::character varying, 'reversal'::character varying]::text[])", name: "chk_user_point_transactions_kind_valid"
+    t.check_constraint "reason_code::text = ANY (ARRAY['purchase'::character varying, 'reward_redemption'::character varying, 'manual_adjustment'::character varying, 'expiry'::character varying, 'reversal'::character varying, 'signup_bonus'::character varying, 'referral_bonus'::character varying, 'admin_correction'::character varying]::text[])", name: "chk_user_point_transactions_reason_code_valid"
+    t.check_constraint "running_balance >= 0", name: "chk_user_point_transactions_running_balance_non_negative"
+  end
+
   create_table "users", force: :cascade do |t|
     t.string "email", default: "", null: false
     t.string "encrypted_password", default: "", null: false
@@ -40,4 +62,6 @@ ActiveRecord::Schema[8.0].define(version: 2026_04_26_201000) do
     t.index ["email"], name: "index_users_on_email", unique: true
     t.index ["reset_password_token"], name: "index_users_on_reset_password_token", unique: true
   end
+
+  add_foreign_key "user_point_transactions", "users"
 end

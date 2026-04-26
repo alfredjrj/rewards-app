@@ -7,9 +7,11 @@ Rails.application.routes.draw do
 
   namespace :api, defaults: { format: :json } do
     namespace :v1 do
-      resources :rewards, only: [:index]
+      resources :rewards, only: [ :index ]
+      resource :user, only: :show do
+        resource :points, only: :show, module: :user
+      end
     end
-    get "me", to: "users#me"
   end
 
   get "up" => "rails/health#show", as: :rails_health_check
