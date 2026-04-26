@@ -1,9 +1,11 @@
-class RewardPolicy
-  attr_reader :user, :record
+class RewardPolicy < ApplicationPolicy
+  class Scope < ApplicationPolicy::Scope
 
-  def initialize(user, record)
-    @user = user
-    @record = record
+    def resolve
+      return scope.none unless user.present?
+
+      scope.where(is_available: true).order(:title)
+    end
   end
 
   def index?

@@ -10,9 +10,24 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_04_25_001911) do
+ActiveRecord::Schema[8.0].define(version: 2026_04_26_201000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
+
+  create_table "rewards", comment: "Catalog of redeemable rewards", force: :cascade do |t|
+    t.string "title", null: false, comment: "Display title shown to users"
+    t.text "description", default: "", null: false, comment: "Detailed reward description"
+    t.integer "points_cost", null: false, comment: "Points required to redeem this reward"
+    t.string "reward_type", null: false, comment: "Reward category (e.g. digital, voucher, physical)"
+    t.boolean "is_available", default: true, null: false, comment: "Whether this reward can be redeemed"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index "((setweight(to_tsvector('english'::regconfig, (COALESCE(title, ''::character varying))::text), 'A'::\"char\") || setweight(to_tsvector('english'::regconfig, COALESCE(description, ''::text)), 'B'::\"char\")))", name: "index_rewards_on_title_and_description_tsv", using: :gin
+    t.index ["title"], name: "index_rewards_on_title_for_search"
+    t.check_constraint "char_length(reward_type::text) > 0", name: "chk_rewards_reward_type_not_blank"
+    t.check_constraint "char_length(title::text) > 0", name: "chk_rewards_title_not_blank"
+    t.check_constraint "points_cost >= 0", name: "chk_rewards_points_cost_non_negative"
+  end
 
   create_table "users", force: :cascade do |t|
     t.string "email", default: "", null: false

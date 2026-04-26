@@ -1,0 +1,196 @@
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import RewardsPage from "@/app/rewards/page";
+
+const replaceMock = vi.fn();
+const fetchRewardsMock = vi.fn();
+const routerMock = { replace: replaceMock };
+
+let authState: { user: { id: number; email: string } | null; loading: boolean } = {
+  user: { id: 1, email: "demo@example.com" },
+  loading: false,
+};
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => routerMock,
+}));
+
+vi.mock("@/lib/auth-context", () => ({
+  useAuth: () => authState,
+}));
+
+vi.mock("@/services/api", () => ({
+  fetchRewards: (...args: unknown[]) => fetchRewardsMock(...args),
+}));
+
+vi.mock("@/components/Navbar", () => ({
+  default: () => <nav data-testid="navbar" />,
+}));
+
+describe("RewardsPage", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    authState = {
+      user: { id: 1, email: "demo@example.com" },
+      loading: false,
+    };
+    fetchRewardsMock.mockResolvedValue({
+      data: [
+        {
+          id: 1,
+          title: "Free Coffee",
+          description: "Redeem for one free coffee.",
+          points_cost: 100,
+          reward_type: "free_item",
+          is_available: true,
+        },
+      ],
+      meta: { page: 1, per_page: 6, total_count: 13, total_pages: 3 },
+    });
+  });
+
+  it("redirects to login when user is not authenticated", async () => {
+    authState = { user: null, loading: false };
+
+    render(<RewardsPage />);
+
+    await waitFor(() => {
+      expect(replaceMock).toHaveBeenCalledWith("/login");
+    });
+    expect(fetchRewardsMock).not.toHaveBeenCalled();
+  });
+
+  it("renders rewards and pagination meta for authenticated users", async () => {
+    render(<RewardsPage />);
+
+    expect(await screen.findByText("Free Coffee")).toBeInTheDocument();
+    expect(screen.getByText("Page 1 of 3 (13 rewards)")).toBeInTheDocument();
+    expect(fetchRewardsMock).toHaveBeenCalledWith({ query: "", page: 1, perPage: 6 });
+  });
+
+  it("shows backend error message when fetch fails", async () => {
+    fetchRewardsMock.mockRejectedValue(new Error("Internal Server Error"));
+
+    render(<RewardsPage />);
+
+    expect(await screen.findByText("Internal Server Error")).toBeInTheDocument();
+  });
+
+  it("handles malformed payload data without crashing", async () => {
+    fetchRewardsMock.mockResolvedValue({
+      data: { bad: "shape" },
+      meta: { page: 1, per_page: 6, total_count: 0, total_pages: 1 },
+    });
+
+    render(<RewardsPage />);
+
+    expect(await screen.findByText("No rewards match your search.")).toBeInTheDocument();
+  });
+
+  it("moves to the next page when pagination button is clicked", async () => {
+    fetchRewardsMock.mockImplementation(
+      async (params: { query?: string; page?: number; perPage?: number }) => {
+        if (params.page === 2) {
+          return {
+            data: [
+              {
+                id: 2,
+                title: "VIP Lounge Pass",
+                description: "Access to the VIP lounge.",
+                points_cost: 900,
+                reward_type: "vip_experience",
+                is_available: true,
+              },
+            ],
+            meta: { page: 2, per_page: 6, total_count: 13, total_pages: 3 },
+          };
+        }
+
+        return {
+          data: [
+            {
+              id: 1,
+              title: "Free Coffee",
+              description: "Redeem for one free coffee.",
+              points_cost: 100,
+              reward_type: "free_item",
+              is_available: true,
+            },
+          ],
+          meta: { page: 1, per_page: 6, total_count: 13, total_pages: 3 },
+        };
+      }
+    );
+
+    const user = userEvent.setup();
+    render(<RewardsPage />);
+
+    expect(await screen.findByText("Free Coffee")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Next" }));
+
+    await waitFor(() => {
+      expect(fetchRewardsMock).toHaveBeenCalledWith({ query: "", page: 2, perPage: 6 });
+    });
+  });
+
+  it("resets to page 1 and applies search query", async () => {
+    fetchRewardsMock.mockImplementation(
+      async (params: { query?: string; page?: number; perPage?: number }) => {
+        if (params.query === "vip") {
+          return {
+            data: [],
+            meta: { page: 1, per_page: 6, total_count: 0, total_pages: 1 },
+          };
+        }
+
+        if (params.page === 2) {
+          return {
+            data: [
+              {
+                id: 2,
+                title: "VIP Lounge Pass",
+                description: "Access to the VIP lounge.",
+                points_cost: 900,
+                reward_type: "vip_experience",
+                is_available: true,
+              },
+            ],
+            meta: { page: 2, per_page: 6, total_count: 13, total_pages: 3 },
+          };
+        }
+
+        return {
+          data: [
+            {
+              id: 1,
+              title: "Free Coffee",
+              description: "Redeem for one free coffee.",
+              points_cost: 100,
+              reward_type: "free_item",
+              is_available: true,
+            },
+          ],
+          meta: { page: 1, per_page: 6, total_count: 13, total_pages: 3 },
+        };
+      }
+    );
+
+    const user = userEvent.setup();
+    render(<RewardsPage />);
+
+    expect(await screen.findByText("Free Coffee")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await waitFor(() => {
+      expect(fetchRewardsMock).toHaveBeenLastCalledWith({ query: "", page: 2, perPage: 6 });
+    });
+
+    await user.type(screen.getByLabelText("Search rewards"), "vip");
+
+    await waitFor(() => {
+      expect(fetchRewardsMock).toHaveBeenLastCalledWith({ query: "vip", page: 1, perPage: 6 });
+    });
+  });
+});

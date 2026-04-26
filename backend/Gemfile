@@ -51,3 +51,6 @@ gem "pundit", "~> 2.5"
 gem "rspec-rails", "~> 8.0", groups: [:development, :test]
 
 gem "factory_bot_rails", "~> 6.5", groups: [:development, :test]
+
+gem "pagy", "~> 43.5"
+gem "pg_search", "~> 2.3"
