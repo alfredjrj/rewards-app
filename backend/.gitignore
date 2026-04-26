@@ -1,0 +1,43 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# Environment and secrets
+/.env*
+/config/master.key
+/config/credentials/*.key
+
+# Bundler
+/.bundle
+/vendor/bundle
+
+# Logs and temp
+/log/*
+/tmp/*
+!/log/.keep
+!/tmp/.keep
+/tmp/pids/*
+!/tmp/pids/.keep
+
+# Uploaded files / local storage
+/storage/*
+!/storage/.keep
+/tmp/storage/*
+!/tmp/storage/.keep
+
+# Compiled assets (precompile output)
+/public/assets
+
+# Ignore default SQLite databases.
+*.sqlite3
+*.sqlite3-*
+
+# Test / coverage
+/coverage
+/.byebug_history
+
+# macOS / editor
+.DS_Store
+/.idea
+/.vscode
+
+# Optional local tooling
+/.ruby-lsp
