@@ -35,5 +35,10 @@ module Backend
 
     # Same-site lax allows cross-site cookies on top-level navigations
     config.action_dispatch.cookies_same_site_protection = :lax
+
+    config.generators do |g|
+      g.test_framework :rspec
+      g.fixture_replacement :factory_bot, dir: "spec/factories"
+    end
   end
 end
