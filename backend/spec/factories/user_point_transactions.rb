@@ -5,7 +5,7 @@ FactoryBot.define do
     running_balance { 100 }
     kind { "earn" }
     reason_code { "signup_bonus" }
-    sequence(:idempotency_key) { |n| "ptx-#{n}" }
+    sequence(:idempotency_key) { |n| format("00000000-0000-0000-0000-%012d", n) }
     reason { "Welcome bonus" }
   end
 end

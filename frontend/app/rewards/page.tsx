@@ -69,6 +69,7 @@ export default function RewardsPage() {
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-purple-900">Rewards</h1>
           <p className="text-purple-600 mt-2">Signed in as {user.email}</p>
+          <p className="text-sm text-purple-700 mt-1">Points balance: {user.points_balance ?? 0}</p>
         </div>
 
         <div className="bg-white rounded-2xl border border-purple-100 shadow-sm p-5 mb-6">

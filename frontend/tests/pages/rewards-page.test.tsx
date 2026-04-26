@@ -7,8 +7,8 @@ const replaceMock = vi.fn();
 const fetchRewardsMock = vi.fn();
 const routerMock = { replace: replaceMock };
 
-let authState: { user: { id: number; email: string } | null; loading: boolean } = {
-  user: { id: 1, email: "demo@example.com" },
+let authState: { user: { id: number; email: string; points_balance?: number } | null; loading: boolean } = {
+  user: { id: 1, email: "demo@example.com", points_balance: 690 },
   loading: false,
 };
 
@@ -32,7 +32,7 @@ describe("RewardsPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     authState = {
-      user: { id: 1, email: "demo@example.com" },
+      user: { id: 1, email: "demo@example.com", points_balance: 690 },
       loading: false,
     };
     fetchRewardsMock.mockResolvedValue({
@@ -66,6 +66,7 @@ describe("RewardsPage", () => {
 
     expect(await screen.findByText("Free Coffee")).toBeInTheDocument();
     expect(screen.getByText("Page 1 of 3 (13 rewards)")).toBeInTheDocument();
+    expect(screen.getByText("Points balance: 690")).toBeInTheDocument();
     expect(fetchRewardsMock).toHaveBeenCalledWith({ query: "", page: 1, perPage: 6 });
   });
 

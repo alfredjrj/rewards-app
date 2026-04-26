@@ -31,7 +31,7 @@ RSpec.describe "Api::V1::User::PointsController", type: :request do
           running_balance: 500,
           kind: "earn",
           reason_code: "signup_bonus",
-          idempotency_key: "points-seed-1"
+          idempotency_key: "fef15c74-c0f2-4b28-813a-ecce35d97d8a"
         )
         create(
           :user_point_transaction,
@@ -40,7 +40,7 @@ RSpec.describe "Api::V1::User::PointsController", type: :request do
           running_balance: 400,
           kind: "redeem",
           reason_code: "reward_redemption",
-          idempotency_key: "points-seed-2"
+          idempotency_key: "3f587c43-d4ff-4453-8835-d59a6159382b"
         )
 
         get "/api/v1/user/points"

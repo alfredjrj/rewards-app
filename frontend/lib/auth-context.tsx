@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import { User, getCurrentUser } from "@/services/api";
+import { User, getCurrentUser, getUserPoints } from "@/services/api";
 
 interface AuthContextValue {
   user: User | null;
@@ -20,8 +20,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getCurrentUser()
-      .then(setUser)
+    Promise.all([getCurrentUser(), getUserPoints()])
+      .then(([profile, points]) => setUser({ ...profile, points_balance: points.points_balance }))
       .catch(() => setUser(null))
       .finally(() => setLoading(false));
   }, []);

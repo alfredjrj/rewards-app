@@ -6,6 +6,20 @@
 - Use explicit, predictable JSON response shapes for API endpoints.
 - Keep routes RESTful and minimize custom actions.
 
+## Service Objects
+- Prefer service objects for multi-step business workflows and transactional writes.
+- Use namespaced classes that map to domain intent (e.g. `User::PointTransactions::Create`).
+- Expose a single entrypoint (`.call`) and keep constructor arguments explicit.
+- Keep services idempotent where applicable (e.g. handle duplicate idempotency keys safely).
+- Put locking/transaction boundaries in services when consistency matters.
+- Prefer standardized service results over ad-hoc exceptions:
+  - `success?` boolean
+  - `transaction`/`data` on success
+  - `error` hash on failure (`code`, `message`, optional `details`)
+- Use stable machine-readable error codes (e.g. `insufficient_balance`, `validation_error`, `internal_error`).
+- Reserve raised exceptions for truly exceptional faults; expected business/validation failures should return failure results.
+- Controllers should translate service result errors into consistent HTTP responses and JSON payloads.
+
 ## Rails Conventions
 - Follow Rails naming and file conventions closely.
 - Use strong parameters in controllers for writable attributes.

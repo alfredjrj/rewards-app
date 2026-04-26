@@ -3,6 +3,17 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL;
 export interface User {
   id: number;
   email: string;
+  points_balance?: number;
+}
+
+export interface UserPoints {
+  data: {
+    points_balance: number;
+  };
+}
+
+export interface UserPointsPayload {
+  points_balance: number;
 }
 
 export interface Reward {
@@ -105,7 +116,12 @@ export async function logout(): Promise<void> {
 }
 
 export async function getCurrentUser(): Promise<User> {
-  return request("/api/me");
+  return request("/api/v1/user");
+}
+
+export async function getUserPoints(): Promise<UserPointsPayload> {
+  const payload = await request<UserPoints>("/api/v1/user/points");
+  return payload.data;
 }
 
 export async function fetchRewards(

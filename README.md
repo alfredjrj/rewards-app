@@ -55,7 +55,7 @@ This file is included with the safe development default.
 
 ## Seed Credentials
 
-After `rails db:setup`, a demo user is created:
+After `rails db:setup`, a demo user is created and catalog of rewards
 
 | Field    | Value              |
 |----------|--------------------|
@@ -133,7 +133,6 @@ No tokens are stored in `localStorage`. Auth state lives entirely in the server-
   - Reads p95: <200 ms
   - Writes p95: <350 ms
 
-This is a planning model, not a benchmark result. Capacity should be validated with staged load tests and revised with real production traffic shape (hourly peaks, campaign bursts, and geographic distribution).
 
 ---
 

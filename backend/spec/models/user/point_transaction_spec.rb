@@ -45,8 +45,9 @@ RSpec.describe User::PointTransaction, type: :model do
 
     it "enforces idempotency_key uniqueness per user" do
       user = create(:user)
-      create(:user_point_transaction, user: user, idempotency_key: "dup-key")
-      duplicate = build(:user_point_transaction, user: user, idempotency_key: "dup-key")
+      key = "22f064cc-62ca-4ca2-9446-fca04ff26f89"
+      create(:user_point_transaction, user: user, idempotency_key: key)
+      duplicate = build(:user_point_transaction, user: user, idempotency_key: key)
 
       expect(duplicate).not_to be_valid
       expect(duplicate.errors[:idempotency_key]).to include("has already been taken")

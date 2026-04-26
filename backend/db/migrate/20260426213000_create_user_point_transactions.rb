@@ -4,7 +4,7 @@ class CreateUserPointTransactions < ActiveRecord::Migration[8.0]
       t.references :user, null: false, foreign_key: true, comment: "Owner of this ledger entry"
       t.integer :amount, null: false, comment: "Signed delta: +earn, -redeem/expiry/reversal"
       t.integer :running_balance, null: false, comment: "User point balance immediately after this entry"
-      t.string :kind, null: false, comment: "Transaction type: earn, redeem, adjustment, expiry, reversal"
+      t.string :kind, null: false, comment: "Transaction type: earn, redeem, adjustment, expiry, reversal, etc"
       t.references :source, polymorphic: true, comment: "Optional source record for traceability"
       t.string :idempotency_key, null: false, comment: "Client/server idempotency token"
       t.string :reason, comment: "Human-readable reason for manual adjustments or audits"

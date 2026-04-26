@@ -15,7 +15,9 @@ describe("services/api", () => {
     const { login } = await import("@/services/api");
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
+      headers: { get: () => "application/json" },
       json: async () => ({ user: { id: 1, email: "demo@example.com" } }),
+      text: async () => JSON.stringify({ user: { id: 1, email: "demo@example.com" } }),
     });
     vi.stubGlobal("fetch", fetchMock);
 
@@ -34,10 +36,11 @@ describe("services/api", () => {
     );
   });
 
-  it("throws backend error message for failed request", async () => {
+  it("throws backend error message for failed current-user request", async () => {
     const { getCurrentUser } = await import("@/services/api");
     const fetchMock = vi.fn().mockResolvedValue({
       ok: false,
+      headers: { get: () => "application/json" },
       json: async () => ({ error: "Not authenticated" }),
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -45,11 +48,31 @@ describe("services/api", () => {
     await expect(getCurrentUser()).rejects.toThrow("Not authenticated");
   });
 
+  it("uses expected path for user points endpoint", async () => {
+    const { getUserPoints } = await import("@/services/api");
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      headers: { get: () => "application/json" },
+      json: async () => ({ data: { points_balance: 690 } }),
+      text: async () => JSON.stringify({ data: { points_balance: 690 } }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(getUserPoints()).resolves.toEqual({ points_balance: 690 });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:3001/api/v1/user/points",
+      expect.objectContaining({ credentials: "include" })
+    );
+  });
+
   it("uses expected paths for signup and logout", async () => {
     const { signup, logout } = await import("@/services/api");
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
+      headers: { get: () => "application/json" },
       json: async () => ({}),
+      text: async () => "{}",
     });
     vi.stubGlobal("fetch", fetchMock);
 
