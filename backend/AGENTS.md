@@ -42,9 +42,11 @@
 - Use request specs for API endpoints and policy specs for authorization rules.
 - Do not duplicate policy truth-table checks in request specs; keep authorization rule assertions in policy specs.
 - For auth endpoints, cover unauthenticated, authenticated, and forbidden paths.
+- Always structure RSpec examples using Arrange-Act-Assert.
 - Keep factories lean and explicit; avoid hidden defaults that mask failures.
 - Add regression specs for bug fixes where practical.
 - Keep setup local/readable; extract helpers only when repetition is real.
+- Prefer explicit class names in specs for readability; avoid `described_class` in examples.
 - Avoid brittle expectations on non-essential text or ordering.
 - Ensure tests fail for the right reason by asserting key fields and statuses.
 - Keep RuboCop clean (`bin/rubocop`) for touched code.

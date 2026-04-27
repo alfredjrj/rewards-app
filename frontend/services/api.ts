@@ -35,6 +35,15 @@ export interface RedemptionResponse {
   };
 }
 
+export interface RedemptionHistoryItem {
+  id: number;
+  reward_id: number;
+  reward_title: string;
+  points_cost_snapshot: number;
+  status: string;
+  created_at: string;
+}
+
 export interface PaginatedResponse<T> {
   data: T[];
   meta: {
@@ -199,5 +208,14 @@ export async function redeemReward(rewardId: number): Promise<RedemptionResponse
       "Idempotency-Key": key,
     },
   });
+}
+
+export async function getUserRedemptions(options: { page?: number; perPage?: number } = {}): Promise<PaginatedResponse<RedemptionHistoryItem>> {
+  const { page, perPage } = options;
+  const params = new URLSearchParams();
+  if (typeof page === "number") params.set("page", String(page));
+  if (typeof perPage === "number") params.set("per_page", String(perPage));
+  const queryString = params.toString() ? `?${params.toString()}` : "";
+  return request<PaginatedResponse<RedemptionHistoryItem>>(`/api/v1/user/redemptions${queryString}`);
 }
 

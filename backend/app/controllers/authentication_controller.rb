@@ -2,6 +2,7 @@ class AuthenticationController < ApplicationController
   include Pundit::Authorization
 
   before_action :authenticate_user!
+  after_action :verify_pundit_authorization!
   rescue_from Pundit::NotAuthorizedError, with: :user_not_authorized
 
   private
@@ -18,5 +19,10 @@ class AuthenticationController < ApplicationController
 
   def user_not_authorized
     render json: { error: "Not authorized" }, status: :forbidden
+  end
+
+  def verify_pundit_authorization!
+    verify_authorized
+    verify_policy_scoped if action_name == "index"
   end
 end

@@ -1,4 +1,28 @@
 class Api::V1::User::RedemptionsController < AuthenticationController
+  DEFAULT_PER_PAGE = 10
+  MAX_PER_PAGE = 50
+
+  def index
+    authorize :redemption, :index?
+
+    scope = policy_scope(User::Redemption, policy_scope_class: RedemptionPolicy::Scope)
+              .includes(:reward)
+              .order(created_at: :desc, id: :desc)
+
+    pagy_request = Pagy::Request.new(
+      request: request,
+      limit: DEFAULT_PER_PAGE,
+      max_limit: MAX_PER_PAGE,
+      limit_key: "per_page"
+    )
+    pagy_obj, paginated_redemptions = Pagy::OffsetPaginator.paginate(scope, request: pagy_request)
+
+    render json: {
+      data: ::Api::V1::User::RedemptionHistoryCollectionSerializer.call(redemptions: paginated_redemptions),
+      meta: ::Api::V1::PaginationMetaSerializer.call(pagy: pagy_obj)
+    }
+  end
+
   def create
     reward = ::Reward.find(redemption_params[:reward_id])
     authorize :redemption, :create?
@@ -12,13 +36,10 @@ class Api::V1::User::RedemptionsController < AuthenticationController
 
     if result.success?
       render json: {
-        data: {
-          id: result.redemption.id,
-          reward_id: result.redemption.reward_id,
-          points_cost_snapshot: result.redemption.points_cost_snapshot,
-          status: result.redemption.status,
+        data: ::Api::V1::User::RedemptionSerializer.call(
+          redemption: result.redemption,
           points_balance: result.points_balance
-        }
+        )
       }, status: :created
       return
     end
@@ -34,7 +55,6 @@ class Api::V1::User::RedemptionsController < AuthenticationController
   end
 
   private
-
   def redemption_params
     params.require(:redemption).permit(:reward_id)
   end

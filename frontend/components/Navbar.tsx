@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { logout } from "@/services/api";
@@ -25,6 +26,12 @@ export default function Navbar() {
         </span>
         {user && (
           <div className="flex items-center gap-4">
+            <Link href="/rewards" className="text-purple-100 text-sm hover:text-white">
+              Rewards
+            </Link>
+            <Link href="/redemptions" className="text-purple-100 text-sm hover:text-white">
+              History
+            </Link>
             <span className="text-purple-200 text-sm">{user.email}</span>
             <button
               onClick={handleLogout}

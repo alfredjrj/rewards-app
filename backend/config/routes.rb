@@ -10,7 +10,7 @@ Rails.application.routes.draw do
       resources :rewards, only: [ :index ]
       resource :user, only: :show do
         resource :points, only: :show, module: :user
-        resources :redemptions, only: [ :create ], module: :user
+        resources :redemptions, only: [ :index, :create ], module: :user
       end
     end
   end

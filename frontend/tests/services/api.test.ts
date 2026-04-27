@@ -126,4 +126,47 @@ describe("services/api", () => {
       })
     );
   });
+
+  it("fetches user redemption history with pagination params", async () => {
+    const { getUserRedemptions } = await import("@/services/api");
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      headers: { get: () => "application/json" },
+      json: async () => ({
+        data: [
+          {
+            id: 11,
+            reward_id: 2,
+            reward_title: "Free Coffee",
+            points_cost_snapshot: 100,
+            status: "completed",
+            created_at: "2026-04-26T19:00:00Z",
+          },
+        ],
+        meta: { page: 1, per_page: 5, total_count: 1, total_pages: 1 },
+      }),
+      text: async () =>
+        JSON.stringify({
+          data: [
+            {
+              id: 11,
+              reward_id: 2,
+              reward_title: "Free Coffee",
+              points_cost_snapshot: 100,
+              status: "completed",
+              created_at: "2026-04-26T19:00:00Z",
+            },
+          ],
+          meta: { page: 1, per_page: 5, total_count: 1, total_pages: 1 },
+        }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await getUserRedemptions({ page: 1, perPage: 5 });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:3001/api/v1/user/redemptions?page=1&per_page=5",
+      expect.objectContaining({ credentials: "include" })
+    );
+  });
 });
