@@ -12,7 +12,7 @@ export default function SignupPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-  const { setUser } = useAuth();
+  const { refreshUser } = useAuth();
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -33,8 +33,8 @@ export default function SignupPage() {
     }
 
     try {
-      const { user } = await signup(email, password, passwordConfirmation);
-      setUser(user);
+      await signup(email, password, passwordConfirmation);
+      await refreshUser();
       router.push("/rewards");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Sign up failed");

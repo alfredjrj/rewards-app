@@ -12,7 +12,7 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-  const { setUser } = useAuth();
+  const { refreshUser } = useAuth();
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -24,8 +24,8 @@ export default function LoginPage() {
     const password = (form.elements.namedItem("password") as HTMLInputElement).value;
 
     try {
-      const { user } = await login(email, password);
-      setUser(user);
+      await login(email, password);
+      await refreshUser();
       router.push("/rewards");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");

@@ -126,6 +126,7 @@ No tokens are stored in `localStorage`. Auth state lives entirely in the server-
 
 ## Non-Functional Requirements
 
+- **Scale**: capacity planning and throughput estimates below assume up to **15 million** daily active users (DAU).
 - **Security**: session-based authentication via secure cookies; protected endpoints return `401` for unauthenticated access and `403` for unauthorized actions.
 - **Performance**: reward list queries should remain responsive; title search must use an index-backed query strategy.
 - **Reliability**: database constraints enforce key invariants (for example non-negative points and non-blank required fields).
@@ -143,23 +144,23 @@ No tokens are stored in `localStorage`. Auth state lives entirely in the server-
 - **Reward catalog browsing (AP-leaning)**: listing/searching rewards can tolerate slightly stale reads, so this flow can prioritize **Availability** and low latency. A briefly stale reward list is acceptable if redemption still validates availability at write time.
 - **Redemption history reads (AP with bounded staleness)**: users can usually tolerate minor read lag (for example, a recently redeemed item appearing moments later), as long as the underlying write path remains strongly consistent.
 
-### Throughput estimate (10M DAU top-down model)
+### Throughput estimate (15M DAU top-down model)
 
-- **Starting point**: 10,000,000 daily active users (DAU).
+- **Starting point**: 15,000,000 daily active users (DAU).
 - **Behavior assumptions**:
   - Average sessions/user/day: 2
   - Average API calls/session: 12
-  - Total API calls/day: `10,000,000 x 2 x 12 = 240,000,000`
-  - Average RPS across full day: `240,000,000 / 86,400 ~= 2,778 RPS`
+  - Total API calls/day: `15,000,000 x 2 x 12 = 360,000,000`
+  - Average RPS across full day: `360,000,000 / 86,400 ~= 4,167 RPS`
   - Peak multiplier: 8x (typical diurnal traffic concentration)
-  - Peak RPS target: `~22,000 RPS`
+  - Peak RPS target: `~33,000 RPS`
 - **Read/write split assumption**:
   - 90% read traffic (catalog, points balance, history)
   - 10% write traffic (redemptions and other mutations)
 - **Capacity targets from that split**:
-  - Read endpoints at peak: `~19,800 RPS`
-  - Write endpoints at peak: `~2,200 RPS`
-  - Redemption endpoint planning budget (subset of writes): `~800-1,500 RPS` depending on campaign spikes
+  - Read endpoints at peak: `~29,700 RPS`
+  - Write endpoints at peak: `~3,300 RPS`
+  - Redemption endpoint planning budget (subset of writes): `~1,200-2,250 RPS` depending on campaign spikes
 - **Latency objective at peak**:
   - Reads p95: <200 ms
   - Writes p95: <350 ms

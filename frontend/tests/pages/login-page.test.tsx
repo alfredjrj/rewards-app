@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import LoginPage from "@/app/login/page";
 
 const pushMock = vi.fn();
-const setUserMock = vi.fn();
+const refreshUserMock = vi.fn().mockResolvedValue(undefined);
 const loginMock = vi.fn();
 
 vi.mock("next/navigation", () => ({
@@ -11,7 +11,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("@/lib/auth-context", () => ({
-  useAuth: () => ({ setUser: setUserMock }),
+  useAuth: () => ({ refreshUser: refreshUserMock }),
 }));
 
 vi.mock("@/services/api", () => ({
@@ -23,7 +23,7 @@ describe("LoginPage", () => {
     vi.clearAllMocks();
   });
 
-  it("submits credentials and redirects on successful login", async () => {
+  it("submits credentials, refreshes session with points, then redirects", async () => {
     loginMock.mockResolvedValueOnce({ user: { id: 1, email: "demo@example.com" } });
 
     render(<LoginPage />);
@@ -37,7 +37,7 @@ describe("LoginPage", () => {
 
     await waitFor(() => {
       expect(loginMock).toHaveBeenCalledWith("demo@example.com", "password123");
-      expect(setUserMock).toHaveBeenCalledWith({ id: 1, email: "demo@example.com" });
+      expect(refreshUserMock).toHaveBeenCalled();
       expect(pushMock).toHaveBeenCalledWith("/rewards");
     });
   });
@@ -56,6 +56,7 @@ describe("LoginPage", () => {
 
     expect(await screen.findByText("Invalid login")).toBeInTheDocument();
     expect(pushMock).not.toHaveBeenCalled();
+    expect(refreshUserMock).not.toHaveBeenCalled();
   });
 
   it("shows the Devise invalid-credentials message returned by the API", async () => {
@@ -73,5 +74,6 @@ describe("LoginPage", () => {
 
     expect(await screen.findByText("Invalid Email or password.")).toBeInTheDocument();
     expect(pushMock).not.toHaveBeenCalled();
+    expect(refreshUserMock).not.toHaveBeenCalled();
   });
 });

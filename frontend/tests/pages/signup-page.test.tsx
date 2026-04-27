@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import SignupPage from "@/app/signup/page";
 
 const pushMock = vi.fn();
-const setUserMock = vi.fn();
+const refreshUserMock = vi.fn().mockResolvedValue(undefined);
 const signupMock = vi.fn();
 
 vi.mock("next/navigation", () => ({
@@ -11,7 +11,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("@/lib/auth-context", () => ({
-  useAuth: () => ({ setUser: setUserMock }),
+  useAuth: () => ({ refreshUser: refreshUserMock }),
 }));
 
 vi.mock("@/services/api", () => ({
@@ -23,7 +23,7 @@ describe("SignupPage", () => {
     vi.clearAllMocks();
   });
 
-  it("submits and redirects on successful signup", async () => {
+  it("submits, refreshes session with points, then redirects", async () => {
     signupMock.mockResolvedValueOnce({ user: { id: 2, email: "new@example.com" } });
 
     render(<SignupPage />);
@@ -40,7 +40,7 @@ describe("SignupPage", () => {
 
     await waitFor(() => {
       expect(signupMock).toHaveBeenCalledWith("new@example.com", "password123", "password123");
-      expect(setUserMock).toHaveBeenCalledWith({ id: 2, email: "new@example.com" });
+      expect(refreshUserMock).toHaveBeenCalled();
       expect(pushMock).toHaveBeenCalledWith("/rewards");
     });
   });
@@ -63,5 +63,6 @@ describe("SignupPage", () => {
 
     expect(await screen.findByText("Email has already been taken")).toBeInTheDocument();
     expect(pushMock).not.toHaveBeenCalled();
+    expect(refreshUserMock).not.toHaveBeenCalled();
   });
 });
