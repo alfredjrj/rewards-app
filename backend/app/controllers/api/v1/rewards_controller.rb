@@ -17,14 +17,8 @@ class Api::V1::RewardsController < AuthenticationController
     # Cursor pagination is better for high-churn, infinite-scroll feeds.
     pagy_obj, paginated_rewards = Pagy::OffsetPaginator.paginate(rewards, request: pagy_request)
 
-    render json: {
-      data: paginated_rewards,
-      meta: {
-        page: pagy_obj.page,
-        per_page: pagy_obj.limit,
-        total_count: pagy_obj.count,
-        total_pages: pagy_obj.pages
-      }
-    }
+    render json: ::Api::V1::RewardSerializer::Collection
+      .call(rewards: paginated_rewards)
+      .merge(meta: ::Api::V1::PaginationMetaSerializer.call(pagy: pagy_obj))
   end
 end

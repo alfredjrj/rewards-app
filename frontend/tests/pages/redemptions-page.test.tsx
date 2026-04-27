@@ -79,7 +79,12 @@ describe("RedemptionsPage", () => {
 
     expect(await screen.findByText("Free Coffee")).toBeInTheDocument();
     expect(screen.getByText("Page 1 of 1 (1 redemptions)")).toBeInTheDocument();
-    expect(getUserRedemptionsMock).toHaveBeenCalledWith({ page: 1, perPage: 10 });
+    expect(getUserRedemptionsMock).toHaveBeenCalledWith({
+      page: 1,
+      perPage: 10,
+      status: undefined,
+      sort: "-created_at",
+    });
   });
 
   it("renders empty state when there are no redemptions", async () => {
@@ -143,7 +148,31 @@ describe("RedemptionsPage", () => {
     await user.click(screen.getByRole("button", { name: "Next" }));
 
     await waitFor(() => {
-      expect(getUserRedemptionsMock).toHaveBeenLastCalledWith({ page: 2, perPage: 10 });
+      expect(getUserRedemptionsMock).toHaveBeenLastCalledWith({
+        page: 2,
+        perPage: 10,
+        status: undefined,
+        sort: "-created_at",
+      });
+    });
+  });
+
+  it("applies redemption filters and sort from controls", async () => {
+    const user = userEvent.setup();
+    renderWithQueryClient(<RedemptionsPage />);
+
+    expect(await screen.findByText("Free Coffee")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Completed" }));
+    await user.click(screen.getByRole("button", { name: "Lowest points" }));
+
+    await waitFor(() => {
+      expect(getUserRedemptionsMock).toHaveBeenLastCalledWith({
+        page: 1,
+        perPage: 10,
+        status: "completed",
+        sort: "points_cost_snapshot",
+      });
     });
   });
 });

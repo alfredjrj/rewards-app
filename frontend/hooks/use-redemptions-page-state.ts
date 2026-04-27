@@ -6,6 +6,10 @@ import { useQuery } from "@tanstack/react-query";
 import { getUserRedemptions, User } from "@/services/api";
 
 const PER_PAGE = 10;
+const SORT_OPTIONS = ["-created_at", "created_at", "-points_cost_snapshot", "points_cost_snapshot"] as const;
+const STATUS_OPTIONS = ["completed", "failed", "cancelled"] as const;
+type SortOption = typeof SORT_OPTIONS[number];
+type StatusOption = typeof STATUS_OPTIONS[number];
 
 type UseRedemptionsPageStateArgs = {
   user: User | null;
@@ -15,12 +19,19 @@ type UseRedemptionsPageStateArgs = {
 export function useRedemptionsPageState({ user, authLoading }: UseRedemptionsPageStateArgs) {
   const router = useRouter();
   const [page, setPage] = useState(1);
+  const [statusFilter, setStatusFilter] = useState<StatusOption | "">("");
+  const [sort, setSort] = useState<SortOption>("-created_at");
   const redemptionsQuery = useQuery({
-    queryKey: ["redemptions", { page, perPage: PER_PAGE }],
+    queryKey: [
+      "redemptions",
+      { page, perPage: PER_PAGE, statusFilter, sort },
+    ],
     queryFn: () =>
       getUserRedemptions({
         page,
         perPage: PER_PAGE,
+        status: statusFilter || undefined,
+        sort,
       }),
     enabled: !authLoading && Boolean(user),
     staleTime: 30_000,
@@ -60,14 +71,28 @@ export function useRedemptionsPageState({ user, authLoading }: UseRedemptionsPag
     setPage((p) => Math.min(totalPages, p + 1));
   }
 
+  function onStatusFilterChange(nextStatus: StatusOption | "") {
+    setStatusFilter(nextStatus);
+    setPage(1);
+  }
+
+  function onSortChange(nextSort: SortOption) {
+    setSort(nextSort);
+    setPage(1);
+  }
+
   return {
     rows,
     status,
     isLoading,
     error,
+    statusFilter,
+    sort,
     page,
     totalPages,
     totalCount,
+    onStatusFilterChange,
+    onSortChange,
     onPreviousPage,
     onNextPage,
   };

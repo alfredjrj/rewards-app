@@ -6,6 +6,10 @@ export interface User {
   points_balance?: number;
 }
 
+export interface UserProfileResponse {
+  data: User;
+}
+
 export interface UserPoints {
   data: {
     points_balance: number;
@@ -42,6 +46,15 @@ export interface RedemptionHistoryItem {
   points_cost_snapshot: number;
   status: string;
   created_at: string;
+}
+
+export interface GetUserRedemptionsOptions {
+  page?: number;
+  perPage?: number;
+  status?: "completed" | "failed" | "cancelled";
+  minPoints?: number;
+  maxPoints?: number;
+  sort?: "created_at" | "-created_at" | "points_cost_snapshot" | "-points_cost_snapshot";
 }
 
 export interface PaginatedResponse<T> {
@@ -177,7 +190,8 @@ export async function logout(): Promise<void> {
 }
 
 export async function getCurrentUser(): Promise<User> {
-  return request("/api/v1/user");
+  const payload = await request<UserProfileResponse>("/api/v1/user");
+  return payload.data;
 }
 
 export async function getUserPoints(): Promise<UserPointsPayload> {
@@ -221,11 +235,15 @@ export async function redeemReward(rewardId: number): Promise<RedemptionResponse
   });
 }
 
-export async function getUserRedemptions(options: { page?: number; perPage?: number } = {}): Promise<PaginatedResponse<RedemptionHistoryItem>> {
-  const { page, perPage } = options;
+export async function getUserRedemptions(options: GetUserRedemptionsOptions = {}): Promise<PaginatedResponse<RedemptionHistoryItem>> {
+  const { page, perPage, status, minPoints, maxPoints, sort } = options;
   const params = new URLSearchParams();
   if (typeof page === "number") params.set("page", String(page));
   if (typeof perPage === "number") params.set("per_page", String(perPage));
+  if (status) params.set("filter[status]", status);
+  if (typeof minPoints === "number") params.set("filter[points][gte]", String(minPoints));
+  if (typeof maxPoints === "number") params.set("filter[points][lte]", String(maxPoints));
+  if (sort) params.set("sort", sort);
   const queryString = params.toString() ? `?${params.toString()}` : "";
   return request<PaginatedResponse<RedemptionHistoryItem>>(`/api/v1/user/redemptions${queryString}`);
 }

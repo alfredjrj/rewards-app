@@ -8,6 +8,7 @@ class Api::V1::User::RedemptionsController < AuthenticationController
     scope = policy_scope(User::Redemption, policy_scope_class: RedemptionPolicy::Scope)
               .includes(:reward)
               .order(created_at: :desc, id: :desc)
+    scope = RedemptionHistoryQuery.new(scope, params).call
 
     pagy_request = Pagy::Request.new(
       request: request,
@@ -17,10 +18,9 @@ class Api::V1::User::RedemptionsController < AuthenticationController
     )
     pagy_obj, paginated_redemptions = Pagy::OffsetPaginator.paginate(scope, request: pagy_request)
 
-    render json: {
-      data: ::Api::V1::User::RedemptionHistoryCollectionSerializer.call(redemptions: paginated_redemptions),
-      meta: ::Api::V1::PaginationMetaSerializer.call(pagy: pagy_obj)
-    }
+    render json: ::Api::V1::User::RedemptionHistorySerializer::Collection
+      .call(redemptions: paginated_redemptions)
+      .merge(meta: ::Api::V1::PaginationMetaSerializer.call(pagy: pagy_obj))
   end
 
   def create

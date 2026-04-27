@@ -8,7 +8,7 @@ RSpec.describe RewardQuery do
     params = { filter: { query: "coffee" } }
     results = RewardQuery.new(Reward.all, params).call
 
-    expect(results.pluck(:title)).to eq(["Coffee Voucher"])
+    expect(results.pluck(:title)).to eq([ "Coffee Voucher" ])
   end
 
   it "filters by reward_types and ignores invalid values" do
@@ -16,10 +16,10 @@ RSpec.describe RewardQuery do
     create(:reward, title: "Movie Ticket", reward_type: "vip_experience")
     create(:reward, title: "Secret Burger", reward_type: "secret_menu")
 
-    params = { filter: { reward_types: ["free_item", "invalid_type"] } }
+    params = { filter: { reward_types: [ "free_item", "invalid_type" ] } }
     results = RewardQuery.new(Reward.all, params).call
 
-    expect(results.pluck(:title)).to eq(["Coffee Voucher"])
+    expect(results.pluck(:title)).to eq([ "Coffee Voucher" ])
   end
 
   it "filters by points lte" do
@@ -29,7 +29,7 @@ RSpec.describe RewardQuery do
     params = { filter: { points: { lte: 150 } } }
     results = RewardQuery.new(Reward.all, params).call
 
-    expect(results.pluck(:title)).to eq(["Low Cost"])
+    expect(results.pluck(:title)).to eq([ "Low Cost" ])
   end
 
   it "filters by points gte" do
@@ -39,7 +39,7 @@ RSpec.describe RewardQuery do
     params = { filter: { points: { gte: 200 } } }
     results = RewardQuery.new(Reward.all, params).call
 
-    expect(results.pluck(:title)).to eq(["High Cost"])
+    expect(results.pluck(:title)).to eq([ "High Cost" ])
   end
 
   it "filters by points range gte and lte" do
@@ -50,7 +50,7 @@ RSpec.describe RewardQuery do
     params = { filter: { points: { gte: 150, lte: 300 } } }
     results = RewardQuery.new(Reward.all, params).call
 
-    expect(results.pluck(:title)).to eq(["Mid Cost"])
+    expect(results.pluck(:title)).to eq([ "Mid Cost" ])
   end
 
   it "sorts ascending when sort uses field name" do
@@ -60,7 +60,7 @@ RSpec.describe RewardQuery do
     params = { sort: "title" }
     results = RewardQuery.new(Reward.all, params).call
 
-    expect(results.pluck(:title)).to eq(["A Item", "B Item"])
+    expect(results.pluck(:title)).to eq([ "A Item", "B Item" ])
   end
 
   it "sorts descending when sort uses -field" do
@@ -70,7 +70,7 @@ RSpec.describe RewardQuery do
     params = { sort: "-points_cost" }
     results = RewardQuery.new(Reward.all, params).call
 
-    expect(results.pluck(:title)).to eq(["B Item", "A Item"])
+    expect(results.pluck(:title)).to eq([ "B Item", "A Item" ])
   end
 
   it "ignores unknown sort fields" do
@@ -78,9 +78,9 @@ RSpec.describe RewardQuery do
     second_reward = create(:reward, title: "Second", points_cost: 200)
 
     params = { sort: "unknown_field" }
-    results = RewardQuery.new(Reward.where(id: [first_reward.id, second_reward.id]).order(:id), params).call
+    results = RewardQuery.new(Reward.where(id: [ first_reward.id, second_reward.id ]).order(:id), params).call
 
-    expect(results.pluck(:id)).to eq([first_reward.id, second_reward.id])
+    expect(results.pluck(:id)).to eq([ first_reward.id, second_reward.id ])
   end
 
   it "applies filters and sort together" do
@@ -89,12 +89,12 @@ RSpec.describe RewardQuery do
     create(:reward, title: "VIP Coffee", reward_type: "vip_experience", points_cost: 500)
 
     params = {
-      filter: { query: "coffee", reward_types: ["free_item"] },
+      filter: { query: "coffee", reward_types: [ "free_item" ] },
       sort: "-points_cost"
     }
 
     results = RewardQuery.new(Reward.all, params).call
 
-    expect(results.pluck(:title)).to eq(["Coffee Deluxe", "Coffee Basic"])
+    expect(results.pluck(:title)).to eq([ "Coffee Deluxe", "Coffee Basic" ])
   end
 end

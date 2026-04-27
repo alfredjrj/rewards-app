@@ -74,7 +74,12 @@ describe("useRedemptionsPageState", () => {
       expect(result.current.isLoading).toBe(false);
     });
 
-    expect(getUserRedemptionsMock).toHaveBeenCalledWith({ page: 1, perPage: 10 });
+    expect(getUserRedemptionsMock).toHaveBeenCalledWith({
+      page: 1,
+      perPage: 10,
+      status: undefined,
+      sort: "-created_at",
+    });
     expect(result.current.rows).toHaveLength(1);
     expect(result.current.totalPages).toBe(2);
     expect(result.current.totalCount).toBe(11);
@@ -123,7 +128,12 @@ describe("useRedemptionsPageState", () => {
     );
 
     await waitFor(() => {
-      expect(getUserRedemptionsMock).toHaveBeenCalledWith({ page: 1, perPage: 10 });
+      expect(getUserRedemptionsMock).toHaveBeenCalledWith({
+        page: 1,
+        perPage: 10,
+        status: undefined,
+        sort: "-created_at",
+      });
     });
     await waitFor(() => {
       expect(result.current.totalPages).toBe(2);
@@ -134,9 +144,42 @@ describe("useRedemptionsPageState", () => {
     });
 
     await waitFor(() => {
-      expect(getUserRedemptionsMock).toHaveBeenLastCalledWith({ page: 2, perPage: 10 });
+      expect(getUserRedemptionsMock).toHaveBeenLastCalledWith({
+        page: 2,
+        perPage: 10,
+        status: undefined,
+        sort: "-created_at",
+      });
     });
     expect(result.current.page).toBe(2);
+  });
+
+  it("applies status and sort filters", async () => {
+    const { result } = renderHook(() =>
+      useRedemptionsPageState({
+        user,
+        authLoading: false,
+      }),
+      { wrapper: createWrapper() }
+    );
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    act(() => {
+      result.current.onStatusFilterChange("failed");
+      result.current.onSortChange("points_cost_snapshot");
+    });
+
+    await waitFor(() => {
+      expect(getUserRedemptionsMock).toHaveBeenLastCalledWith({
+        page: 1,
+        perPage: 10,
+        status: "failed",
+        sort: "points_cost_snapshot",
+      });
+    });
   });
 
   it("surfaces backend fetch errors", async () => {

@@ -69,6 +69,32 @@ RSpec.describe "Api::V1::User::RedemptionsController", type: :request do
           "total_pages" => 3
         )
       end
+
+      it "filters by points range using filter[points][gte/lte]" do
+        reward = create(:reward)
+        create(:user_redemption, user: user, reward: reward, points_cost_snapshot: 100)
+        create(:user_redemption, user: user, reward: reward, points_cost_snapshot: 250)
+        create(:user_redemption, user: user, reward: reward, points_cost_snapshot: 500)
+
+        get "/api/v1/user/redemptions", params: { filter: { points: { gte: 150, lte: 300 } } }
+
+        expect(response).to have_http_status(:ok)
+        body = JSON.parse(response.body)
+        expect(body["data"].length).to eq(1)
+        expect(body["data"].first["points_cost_snapshot"]).to eq(250)
+      end
+
+      it "filters by status" do
+        reward = create(:reward)
+        create(:user_redemption, user: user, reward: reward, status: "completed")
+        create(:user_redemption, user: user, reward: reward, status: "cancelled")
+
+        get "/api/v1/user/redemptions", params: { filter: { status: "cancelled" } }
+
+        expect(response).to have_http_status(:ok)
+        body = JSON.parse(response.body)
+        expect(body["data"].map { |row| row["status"] }.uniq).to eq([ "cancelled" ])
+      end
     end
   end
 

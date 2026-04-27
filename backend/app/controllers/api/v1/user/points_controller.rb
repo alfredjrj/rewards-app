@@ -7,6 +7,6 @@ class Api::V1::User::PointsController < AuthenticationController
       .order(created_at: :desc, id: :desc)
       .pick(:running_balance) || 0
 
-    render json: { data: { points_balance: points_balance } }
+    render json: ::Api::V1::User::PointsBalanceSerializer.call(points_balance: points_balance)
   end
 end

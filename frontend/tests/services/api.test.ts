@@ -48,6 +48,24 @@ describe("services/api", () => {
     await expect(getCurrentUser()).rejects.toThrow("Not authenticated");
   });
 
+  it("returns nested data payload for current-user endpoint", async () => {
+    const { getCurrentUser } = await import("@/services/api");
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      headers: { get: () => "application/json" },
+      json: async () => ({ data: { id: 1, email: "demo@example.com" } }),
+      text: async () => JSON.stringify({ data: { id: 1, email: "demo@example.com" } }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(getCurrentUser()).resolves.toEqual({ id: 1, email: "demo@example.com" });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:3001/api/v1/user",
+      expect.objectContaining({ credentials: "include" })
+    );
+  });
+
   it("uses nested backend error.message when error is an object", async () => {
     const { redeemReward } = await import("@/services/api");
     const fetchMock = vi.fn().mockResolvedValue({
@@ -166,6 +184,32 @@ describe("services/api", () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       "http://localhost:3001/api/v1/user/redemptions?page=1&per_page=5",
+      expect.objectContaining({ credentials: "include" })
+    );
+  });
+
+  it("sends redemption history filters and sort", async () => {
+    const { getUserRedemptions } = await import("@/services/api");
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      headers: { get: () => "application/json" },
+      json: async () => ({ data: [], meta: { page: 1, per_page: 5, total_count: 0, total_pages: 1 } }),
+      text: async () =>
+        JSON.stringify({ data: [], meta: { page: 1, per_page: 5, total_count: 0, total_pages: 1 } }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await getUserRedemptions({
+      page: 1,
+      perPage: 5,
+      status: "completed",
+      minPoints: 100,
+      maxPoints: 300,
+      sort: "-created_at",
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:3001/api/v1/user/redemptions?page=1&per_page=5&filter%5Bstatus%5D=completed&filter%5Bpoints%5D%5Bgte%5D=100&filter%5Bpoints%5D%5Blte%5D=300&sort=-created_at",
       expect.objectContaining({ credentials: "include" })
     );
   });
