@@ -1,10 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchRewards, redeemReward, Reward } from "@/services/api";
 import { User } from "@/services/api";
-import { usePaginatedQuery } from "@/hooks/use-paginated-query";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 
 type RedemptionSuccessState = {
@@ -24,35 +24,44 @@ const SEARCH_DEBOUNCE_MS = 500;
 
 export function useRewardsPageState({ user, authLoading, setUser }: UseRewardsPageStateArgs) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [query, setQuery] = useState("");
+  const [page, setPage] = useState(1);
+  const [selectedRewardTypes, setSelectedRewardTypes] = useState<Reward["reward_type"][]>([]);
+  const [affordableOnly, setAffordableOnly] = useState(false);
+  const [redeemError, setRedeemError] = useState("");
   const debouncedQuery = useDebouncedValue(query, SEARCH_DEBOUNCE_MS);
-  const fetchRewardsPage = useCallback(
-    (queryParams: { query: string; page: number }) =>
-      fetchRewards({
-        query: queryParams.query,
-        page: queryParams.page,
-        perPage: PER_PAGE,
-      }),
-    []
-  );
   const [redeemingId, setRedeemingId] = useState<number | null>(null);
   const [pendingReward, setPendingReward] = useState<Reward | null>(null);
   const [redemptionSuccess, setRedemptionSuccess] = useState<RedemptionSuccessState | null>(null);
-  const {
-    rows: rewards,
-    status,
-    error,
-    isLoading,
-    params,
-    setParams,
-    setPage,
-    meta,
-    setError,
-  } = usePaginatedQuery({
-    initialParams: { query: "", page: 1 },
+
+  const rewardsQuery = useQuery({
+    queryKey: [
+      "rewards",
+      {
+        query: debouncedQuery,
+        page,
+        perPage: PER_PAGE,
+        rewardTypes: selectedRewardTypes,
+        affordableOnly,
+        maxPoints: user?.points_balance ?? 0,
+      },
+    ],
+    queryFn: () => {
+      return fetchRewards({
+        query: debouncedQuery,
+        page,
+        perPage: PER_PAGE,
+        rewardTypes: selectedRewardTypes,
+        affordableOnly,
+        maxPoints: user?.points_balance ?? 0,
+      });
+    },
     enabled: !authLoading && Boolean(user),
-    defaultErrorMessage: "Failed to load rewards",
-    fetcher: fetchRewardsPage,
+    staleTime: 30_000,
+  });
+  const redeemMutation = useMutation({
+    mutationFn: (rewardId: number) => redeemReward(rewardId),
   });
 
   useEffect(() => {
@@ -62,23 +71,34 @@ export function useRewardsPageState({ user, authLoading, setUser }: UseRewardsPa
   }, [user, authLoading, router]);
 
   useEffect(() => {
-    setParams((prev) => {
-      if (prev.query === debouncedQuery && prev.page === 1) return prev;
-      return {
-        ...prev,
-        query: debouncedQuery,
-        page: 1,
-      };
-    });
-  }, [debouncedQuery, setParams]);
+    setPage(1);
+  }, [debouncedQuery]);
+
+  const rewards = useMemo(
+    () => (Array.isArray(rewardsQuery.data?.data) ? rewardsQuery.data.data : []),
+    [rewardsQuery.data]
+  );
+  const totalPages = rewardsQuery.data?.meta?.total_pages ?? 1;
+  const totalCount = rewardsQuery.data?.meta?.total_count ?? rewards.length;
+  const queryError =
+    rewardsQuery.error instanceof Error ? rewardsQuery.error.message : "Failed to load rewards";
+  const error = redeemError || (rewardsQuery.isError ? queryError : "");
+  const status = authLoading || !user
+    ? "idle"
+    : rewardsQuery.isError
+      ? "error"
+      : rewardsQuery.isSuccess
+        ? "success"
+        : "loading";
+  const isLoading = rewardsQuery.isPending || rewardsQuery.isFetching;
 
   async function handleRedeem(reward: Reward) {
     if (!user || redeemingId) return;
 
     setRedeemingId(reward.id);
-    setError("");
+    setRedeemError("");
     try {
-      const payload = await redeemReward(reward.id);
+      const payload = await redeemMutation.mutateAsync(reward.id);
       const pointsBalance = payload.data.points_balance;
       setUser({ ...user, points_balance: pointsBalance });
       setRedemptionSuccess({
@@ -86,8 +106,9 @@ export function useRewardsPageState({ user, authLoading, setUser }: UseRewardsPa
         pointsSpent: reward.points_cost,
         pointsBalance,
       });
+      await queryClient.invalidateQueries({ queryKey: ["rewards"] });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to redeem reward");
+      setRedeemError(err instanceof Error ? err.message : "Failed to redeem reward");
     } finally {
       setRedeemingId(null);
     }
@@ -100,7 +121,7 @@ export function useRewardsPageState({ user, authLoading, setUser }: UseRewardsPa
   }
 
   function openRedeemModal(reward: Reward) {
-    setError("");
+    setRedeemError("");
     setPendingReward(reward);
   }
 
@@ -108,12 +129,24 @@ export function useRewardsPageState({ user, authLoading, setUser }: UseRewardsPa
     setQuery(nextQuery);
   }
 
+  function toggleRewardType(type: Reward["reward_type"]) {
+    setSelectedRewardTypes((prev) =>
+      prev.includes(type) ? prev.filter((value) => value !== type) : [...prev, type]
+    );
+    setPage(1);
+  }
+
+  function onAffordableOnlyChange(nextValue: boolean) {
+    setAffordableOnly(nextValue);
+    setPage(1);
+  }
+
   function onPreviousPage() {
     setPage((p) => Math.max(1, p - 1));
   }
 
   function onNextPage() {
-    setPage((p) => Math.min(meta.totalPages, p + 1));
+    setPage((p) => Math.min(totalPages, p + 1));
   }
 
   return {
@@ -122,9 +155,11 @@ export function useRewardsPageState({ user, authLoading, setUser }: UseRewardsPa
     isLoading,
     error,
     query,
-    page: params.page,
-    totalPages: meta.totalPages,
-    totalCount: meta.totalCount,
+    selectedRewardTypes,
+    affordableOnly,
+    page,
+    totalPages,
+    totalCount,
     redeemingId,
     pendingReward,
     redemptionSuccess,
@@ -133,6 +168,8 @@ export function useRewardsPageState({ user, authLoading, setUser }: UseRewardsPa
     confirmRedeem,
     openRedeemModal,
     onSearchChange,
+    toggleRewardType,
+    onAffordableOnlyChange,
     onPreviousPage,
     onNextPage,
   };

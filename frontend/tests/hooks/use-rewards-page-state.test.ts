@@ -1,4 +1,6 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { ReactNode, createElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useRewardsPageState } from "@/hooks/use-rewards-page-state";
 
@@ -26,6 +28,18 @@ describe("useRewardsPageState", () => {
     is_available: true,
   };
   const setUserMock = vi.fn();
+  function createWrapper() {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    return function Wrapper({ children }: { children: ReactNode }) {
+      return createElement(QueryClientProvider, { client: queryClient }, children);
+    };
+  }
 
   beforeEach(() => {
     vi.useRealTimers();
@@ -55,7 +69,8 @@ describe("useRewardsPageState", () => {
         user: null,
         authLoading: false,
         setUser: setUserMock,
-      })
+      }),
+      { wrapper: createWrapper() }
     );
 
     await waitFor(() => {
@@ -70,14 +85,22 @@ describe("useRewardsPageState", () => {
         user,
         authLoading: false,
         setUser: setUserMock,
-      })
+      }),
+      { wrapper: createWrapper() }
     );
 
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
     });
 
-    expect(fetchRewardsMock).toHaveBeenCalledWith({ query: "", page: 1, perPage: 6 });
+    expect(fetchRewardsMock).toHaveBeenCalledWith({
+      query: "",
+      page: 1,
+      perPage: 6,
+      rewardTypes: [],
+      affordableOnly: false,
+      maxPoints: 690,
+    });
     expect(result.current.rewards).toEqual([reward]);
     expect(result.current.totalPages).toBe(1);
     expect(result.current.totalCount).toBe(1);
@@ -90,11 +113,19 @@ describe("useRewardsPageState", () => {
         user,
         authLoading: false,
         setUser: setUserMock,
-      })
+      }),
+      { wrapper: createWrapper() }
     );
 
     await waitFor(() => {
-      expect(fetchRewardsMock).toHaveBeenCalledWith({ query: "", page: 1, perPage: 6 });
+      expect(fetchRewardsMock).toHaveBeenCalledWith({
+        query: "",
+        page: 1,
+        perPage: 6,
+        rewardTypes: [],
+        affordableOnly: false,
+        maxPoints: 690,
+      });
     });
     act(() => {
       result.current.onSearchChange("vip");
@@ -110,7 +141,8 @@ describe("useRewardsPageState", () => {
         user,
         authLoading: false,
         setUser: setUserMock,
-      })
+      }),
+      { wrapper: createWrapper() }
     );
 
     await waitFor(() => {

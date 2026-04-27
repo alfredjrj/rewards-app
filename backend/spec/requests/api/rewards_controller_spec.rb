@@ -39,7 +39,7 @@ RSpec.describe "Api::V1::RewardsController", type: :request do
         create(:reward, title: "Movie Ticket", description: "Cinema popcorn combo")
         create(:reward, title: "Spa Session", description: "Relaxing coffee scrub")
 
-        get "/api/v1/rewards", params: { query: "coffee" }
+        get "/api/v1/rewards", params: { filter: { query: "coffee" } }
 
         expect(response).to have_http_status(:ok)
         body = JSON.parse(response.body)
@@ -50,7 +50,7 @@ RSpec.describe "Api::V1::RewardsController", type: :request do
         create(:reward, title: "Chef Special", description: "Limited-time menu item")
         create(:reward, title: "Coffee Voucher", description: "Freshly brewed drink")
 
-        get "/api/v1/rewards", params: { query: "ch" }
+        get "/api/v1/rewards", params: { filter: { query: "ch" } }
 
         expect(response).to have_http_status(:ok)
         body = JSON.parse(response.body)
@@ -74,6 +74,63 @@ RSpec.describe "Api::V1::RewardsController", type: :request do
           "total_count" => 4,
           "total_pages" => 2
         )
+      end
+
+      it "filters by multiple reward types" do
+        create(:reward, title: "Coffee Voucher", reward_type: "free_item")
+        create(:reward, title: "Movie Ticket", reward_type: "vip_experience")
+        create(:reward, title: "Secret Burger", reward_type: "secret_menu")
+
+        get "/api/v1/rewards", params: { filter: { reward_types: [ "free_item", "vip_experience" ] } }
+
+        expect(response).to have_http_status(:ok)
+        body = JSON.parse(response.body)
+        expect(body["data"].map { |r| r["title"] }).to eq([ "Coffee Voucher", "Movie Ticket" ])
+      end
+
+      it "filters by affordability using filter[points][lte]" do
+        create(:reward, title: "Coffee Voucher", points_cost: 100)
+        create(:reward, title: "Movie Ticket", points_cost: 500)
+
+        get "/api/v1/rewards", params: { filter: { points: { lte: 150 } } }
+
+        expect(response).to have_http_status(:ok)
+        body = JSON.parse(response.body)
+        expect(body["data"].map { |r| r["title"] }).to eq([ "Coffee Voucher" ])
+      end
+
+      it "filters by minimum points using filter[points][gte]" do
+        create(:reward, title: "Coffee Voucher", points_cost: 100)
+        create(:reward, title: "Movie Ticket", points_cost: 500)
+
+        get "/api/v1/rewards", params: { filter: { points: { gte: 200 } } }
+
+        expect(response).to have_http_status(:ok)
+        body = JSON.parse(response.body)
+        expect(body["data"].map { |r| r["title"] }).to eq([ "Movie Ticket" ])
+      end
+
+      it "filters by points range using gte and lte" do
+        create(:reward, title: "Coffee Voucher", points_cost: 100)
+        create(:reward, title: "Movie Ticket", points_cost: 250)
+        create(:reward, title: "Spa Session", points_cost: 500)
+
+        get "/api/v1/rewards", params: { filter: { points: { gte: 150, lte: 300 } } }
+
+        expect(response).to have_http_status(:ok)
+        body = JSON.parse(response.body)
+        expect(body["data"].map { |r| r["title"] }).to eq([ "Movie Ticket" ])
+      end
+
+      it "sorts by whitelisted fields using sort param" do
+        create(:reward, title: "A Item", points_cost: 200)
+        create(:reward, title: "B Item", points_cost: 100)
+
+        get "/api/v1/rewards", params: { sort: "-points_cost" }
+
+        expect(response).to have_http_status(:ok)
+        body = JSON.parse(response.body)
+        expect(body["data"].map { |r| r["title"] }).to eq([ "A Item", "B Item" ])
       end
     end
   end

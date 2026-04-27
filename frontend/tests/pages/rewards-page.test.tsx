@@ -1,5 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import userEvent from "@testing-library/user-event";
+import { ReactElement } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import RewardsPage from "@/app/rewards/page";
 
@@ -10,6 +12,16 @@ const setUserMock = vi.fn((nextUser: { id: number; email: string; points_balance
   authState = { ...authState, user: nextUser };
 });
 const routerMock = { replace: replaceMock };
+function renderWithQueryClient(ui: ReactElement) {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  });
+
+  return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
+}
 
 let authState: {
   user: { id: number; email: string; points_balance?: number } | null;
@@ -73,7 +85,7 @@ describe("RewardsPage", () => {
   it("redirects to login when user is not authenticated", async () => {
     authState = { user: null, loading: false, setUser: setUserMock };
 
-    render(<RewardsPage />);
+    renderWithQueryClient(<RewardsPage />);
 
     await waitFor(() => {
       expect(replaceMock).toHaveBeenCalledWith("/login");
@@ -82,19 +94,26 @@ describe("RewardsPage", () => {
   });
 
   it("renders rewards and pagination meta for authenticated users", async () => {
-    render(<RewardsPage />);
+    renderWithQueryClient(<RewardsPage />);
 
     expect(await screen.findByText("Free Coffee")).toBeInTheDocument();
     expect(screen.getByText("Page 1 of 3 (13 rewards)")).toBeInTheDocument();
     expect(screen.getByText("Available points")).toBeInTheDocument();
     expect(screen.getByText("690 pts")).toBeInTheDocument();
-    expect(fetchRewardsMock).toHaveBeenCalledWith({ query: "", page: 1, perPage: 6 });
+    expect(fetchRewardsMock).toHaveBeenCalledWith({
+      query: "",
+      page: 1,
+      perPage: 6,
+      rewardTypes: [],
+      affordableOnly: false,
+      maxPoints: 690,
+    });
   });
 
   it("shows backend error message when fetch fails", async () => {
     fetchRewardsMock.mockRejectedValue(new Error("Internal Server Error"));
 
-    render(<RewardsPage />);
+    renderWithQueryClient(<RewardsPage />);
 
     expect(await screen.findByText("Internal Server Error")).toBeInTheDocument();
   });
@@ -105,7 +124,7 @@ describe("RewardsPage", () => {
       meta: { page: 1, per_page: 6, total_count: 0, total_pages: 1 },
     });
 
-    render(<RewardsPage />);
+    renderWithQueryClient(<RewardsPage />);
 
     expect(await screen.findByText("No rewards match your search.")).toBeInTheDocument();
   });
@@ -146,14 +165,21 @@ describe("RewardsPage", () => {
     );
 
     const user = userEvent.setup();
-    render(<RewardsPage />);
+    renderWithQueryClient(<RewardsPage />);
 
     expect(await screen.findByText("Free Coffee")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Next" }));
 
     await waitFor(() => {
-      expect(fetchRewardsMock).toHaveBeenCalledWith({ query: "", page: 2, perPage: 6 });
+      expect(fetchRewardsMock).toHaveBeenCalledWith({
+        query: "",
+        page: 2,
+        perPage: 6,
+        rewardTypes: [],
+        affordableOnly: false,
+        maxPoints: 690,
+      });
     });
   });
 
@@ -200,25 +226,70 @@ describe("RewardsPage", () => {
     );
 
     const user = userEvent.setup();
-    render(<RewardsPage />);
+    renderWithQueryClient(<RewardsPage />);
 
     expect(await screen.findByText("Free Coffee")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Next" }));
     await waitFor(() => {
-      expect(fetchRewardsMock).toHaveBeenLastCalledWith({ query: "", page: 2, perPage: 6 });
+      expect(fetchRewardsMock).toHaveBeenLastCalledWith({
+        query: "",
+        page: 2,
+        perPage: 6,
+        rewardTypes: [],
+        affordableOnly: false,
+        maxPoints: 690,
+      });
     });
 
     await user.type(screen.getByLabelText("Search rewards"), "vip");
 
     await waitFor(() => {
-      expect(fetchRewardsMock).toHaveBeenLastCalledWith({ query: "vip", page: 1, perPage: 6 });
+      expect(fetchRewardsMock).toHaveBeenLastCalledWith({
+        query: "vip",
+        page: 1,
+        perPage: 6,
+        rewardTypes: [],
+        affordableOnly: false,
+        maxPoints: 690,
+      });
+    });
+  });
+
+  it("applies reward type and affordability filters", async () => {
+    const user = userEvent.setup();
+    renderWithQueryClient(<RewardsPage />);
+
+    expect(await screen.findByText("Free Coffee")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "VIP Experience" }));
+    await waitFor(() => {
+      expect(fetchRewardsMock).toHaveBeenLastCalledWith({
+        query: "",
+        page: 1,
+        perPage: 6,
+        rewardTypes: ["vip_experience"],
+        affordableOnly: false,
+        maxPoints: 690,
+      });
+    });
+
+    await user.click(screen.getByRole("button", { name: "Fits my points budget: Off" }));
+    await waitFor(() => {
+      expect(fetchRewardsMock).toHaveBeenLastCalledWith({
+        query: "",
+        page: 1,
+        perPage: 6,
+        rewardTypes: ["vip_experience"],
+        affordableOnly: true,
+        maxPoints: 690,
+      });
     });
   });
 
   it("shows a confirmation modal and redeems after confirm", async () => {
     const user = userEvent.setup();
-    render(<RewardsPage />);
+    renderWithQueryClient(<RewardsPage />);
 
     expect(await screen.findByText("Free Coffee")).toBeInTheDocument();
 

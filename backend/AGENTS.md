@@ -42,7 +42,7 @@
 - Use request specs for API endpoints and policy specs for authorization rules.
 - Do not duplicate policy truth-table checks in request specs; keep authorization rule assertions in policy specs.
 - For auth endpoints, cover unauthenticated, authenticated, and forbidden paths.
-- Always structure RSpec examples using Arrange-Act-Assert.
+- Structure RSpec examples in Arrange-Act-Assert flow, but do not add literal comments like `# Arrange`, `# Act`, or `# Assert`.
 - Keep factories lean and explicit; avoid hidden defaults that mask failures.
 - Add regression specs for bug fixes where practical.
 - Keep setup local/readable; extract helpers only when repetition is real.

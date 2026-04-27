@@ -18,6 +18,8 @@ export default function RewardsPage() {
     isLoading,
     error,
     query,
+    selectedRewardTypes,
+    affordableOnly,
     page,
     totalPages,
     totalCount,
@@ -29,6 +31,8 @@ export default function RewardsPage() {
     confirmRedeem,
     openRedeemModal,
     onSearchChange,
+    toggleRewardType,
+    onAffordableOnlyChange,
     onPreviousPage,
     onNextPage,
   } = useRewardsPageState({ user, authLoading, setUser });
@@ -100,6 +104,52 @@ export default function RewardsPage() {
             placeholder="e.g. coffee, ticket, spa"
             className="w-full border border-gray-200 rounded-xl px-4 py-3 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
           />
+
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <p className="block text-sm font-medium text-gray-700 mb-2">Reward types</p>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { id: "free_item", label: "Free Item" },
+                  { id: "vip_experience", label: "VIP Experience" },
+                  { id: "secret_menu", label: "Secret Menu" },
+                ].map((option) => {
+                  const isActive = selectedRewardTypes.includes(option.id as "free_item" | "vip_experience" | "secret_menu");
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      aria-pressed={isActive}
+                      onClick={() => toggleRewardType(option.id as "free_item" | "vip_experience" | "secret_menu")}
+                      className={`rounded-full px-3 py-1.5 text-sm border transition ${
+                        isActive
+                          ? "bg-purple-600 text-white border-purple-600"
+                          : "bg-white text-gray-700 border-gray-300 hover:border-purple-400"
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="flex items-end">
+              <button
+                id="affordable-only-filter"
+                type="button"
+                aria-pressed={affordableOnly}
+                onClick={() => onAffordableOnlyChange(!affordableOnly)}
+                className={`inline-flex items-center rounded-full px-3 py-2 text-sm border transition ${
+                  affordableOnly
+                    ? "bg-emerald-600 text-white border-emerald-600"
+                    : "bg-white text-gray-700 border-gray-300 hover:border-emerald-400"
+                }`}
+              >
+                {affordableOnly ? "Fits my points budget: On" : "Fits my points budget: Off"}
+              </button>
+            </div>
+          </div>
         </div>
 
         {isLoading && <RewardsGridSkeleton />}

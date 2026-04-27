@@ -169,4 +169,32 @@ describe("services/api", () => {
       expect.objectContaining({ credentials: "include" })
     );
   });
+
+  it("sends rewards filters and sort using filter param map", async () => {
+    const { fetchRewards } = await import("@/services/api");
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      headers: { get: () => "application/json" },
+      json: async () => ({ data: [], meta: { page: 1, per_page: 6, total_count: 0, total_pages: 1 } }),
+      text: async () =>
+        JSON.stringify({ data: [], meta: { page: 1, per_page: 6, total_count: 0, total_pages: 1 } }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchRewards({
+      query: "coffee",
+      rewardTypes: ["free_item", "vip_experience"],
+      minPoints: 50,
+      affordableOnly: true,
+      maxPoints: 200,
+      page: 2,
+      perPage: 6,
+      sort: "-points_cost",
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:3001/api/v1/rewards?filter%5Bquery%5D=coffee&filter%5Breward_types%5D%5B%5D=free_item&filter%5Breward_types%5D%5B%5D=vip_experience&filter%5Bpoints%5D%5Bgte%5D=50&filter%5Bpoints%5D%5Blte%5D=200&page=2&per_page=6&sort=-points_cost",
+      expect.objectContaining({ credentials: "include" })
+    );
+  });
 });

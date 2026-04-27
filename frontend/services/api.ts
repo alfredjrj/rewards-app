@@ -58,6 +58,11 @@ export interface FetchRewardsOptions {
   query?: string;
   page?: number;
   perPage?: number;
+  rewardTypes?: Reward["reward_type"][];
+  minPoints?: number;
+  affordableOnly?: boolean;
+  maxPoints?: number;
+  sort?: "title" | "-title" | "points_cost" | "-points_cost" | "created_at" | "-created_at";
 }
 
 function parseErrorMessage(data: unknown): string {
@@ -183,13 +188,19 @@ export async function getUserPoints(): Promise<UserPointsPayload> {
 export async function fetchRewards(
   options: FetchRewardsOptions = {}
 ): Promise<PaginatedResponse<Reward>> {
-  const { query: searchQuery, page, perPage } = options;
+  const { query: searchQuery, page, perPage, rewardTypes, minPoints, affordableOnly, maxPoints, sort } = options;
   const params = new URLSearchParams();
   const normalizedQuery = searchQuery?.trim();
 
-  if (normalizedQuery) params.set("query", normalizedQuery);
+  if (normalizedQuery) params.set("filter[query]", normalizedQuery);
+  if (Array.isArray(rewardTypes)) {
+    rewardTypes.forEach((rewardType) => params.append("filter[reward_types][]", rewardType));
+  }
+  if (typeof minPoints === "number") params.set("filter[points][gte]", String(minPoints));
+  if (affordableOnly && typeof maxPoints === "number") params.set("filter[points][lte]", String(maxPoints));
   if (typeof page === "number") params.set("page", String(page));
   if (typeof perPage === "number") params.set("per_page", String(perPage));
+  if (sort) params.set("sort", sort);
 
   const queryString = params.toString() ? `?${params.toString()}` : "";
   return request<PaginatedResponse<Reward>>(`/api/v1/rewards${queryString}`);

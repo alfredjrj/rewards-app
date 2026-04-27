@@ -4,22 +4,6 @@ user = User.find_or_create_by!(email: "demo@example.com") do |u|
 end
 puts "User created: #{user.email}"
 
-point_transactions_seed = [
-  { amount: 500, kind: "earn", reason_code: "signup_bonus", reason: "Initial signup reward", idempotency_key: "seed-signup-bonus" },
-  { amount: 250, kind: "earn", reason_code: "purchase", reason: "Points earned from first purchase", idempotency_key: "seed-first-purchase" },
-  { amount: -100, kind: "redeem", reason_code: "reward_redemption", reason: "Redeemed Free Coffee", idempotency_key: "seed-redeem-coffee" },
-  { amount: 120, kind: "earn", reason_code: "referral_bonus", reason: "Referral reward", idempotency_key: "seed-referral-bonus" },
-  { amount: -80, kind: "expiry", reason_code: "expiry", reason: "Monthly point expiry adjustment", idempotency_key: "seed-monthly-expiry" }
-]
-
-running_balance = 0
-point_transactions_seed.each do |attrs|
-  running_balance += attrs[:amount]
-  tx = User::PointTransaction.find_or_initialize_by(user: user, idempotency_key: attrs[:idempotency_key])
-  tx.update!(attrs.merge(running_balance: running_balance))
-  puts "Point transaction seeded: #{tx.kind} #{tx.amount} (balance: #{tx.running_balance})"
-end
-
 rewards_data = [
   {
     title: "Free Coffee",
@@ -204,4 +188,62 @@ rewards_data.each do |attrs|
   puts "Reward seeded: #{reward.title} (#{reward.points_cost} points)"
 end
 
+running_balance = 0
+
+base_point_transactions_seed = [
+  { amount: 1000, kind: "earn", reason_code: "signup_bonus", reason: "Initial signup reward", idempotency_key: "seed-signup-bonus" },
+  { amount: 250, kind: "earn", reason_code: "purchase", reason: "Points earned from first purchase", idempotency_key: "seed-first-purchase" },
+  { amount: 2000, kind: "earn", reason_code: "referral_bonus", reason: "Referral reward", idempotency_key: "seed-referral-bonus" },
+  { amount: -80, kind: "expiry", reason_code: "expiry", reason: "Monthly point expiry adjustment", idempotency_key: "seed-monthly-expiry" }
+]
+
+base_point_transactions_seed.each do |attrs|
+  running_balance += attrs[:amount]
+  tx = User::PointTransaction.find_or_initialize_by(user: user, idempotency_key: attrs[:idempotency_key])
+  tx.update!(attrs.merge(running_balance: running_balance))
+  puts "Point transaction seeded: #{tx.kind} #{tx.amount} (balance: #{tx.running_balance})"
+end
+
+user_redemptions_seed = [
+  { reward_title: "Free Coffee", idempotency_key: "seed-redeem-001" },
+  { reward_title: "$5 Gift Card", idempotency_key: "seed-redeem-002" },
+  { reward_title: "Free Breakfast Combo", idempotency_key: "seed-redeem-003" },
+  { reward_title: "Free Dessert", idempotency_key: "seed-redeem-004" },
+  { reward_title: "Free Smoothie", idempotency_key: "seed-redeem-005" },
+  { reward_title: "Free Sandwich", idempotency_key: "seed-redeem-006" },
+  { reward_title: "Priority Support Pass", idempotency_key: "seed-redeem-007" },
+  { reward_title: "Free Salad Bowl", idempotency_key: "seed-redeem-008" },
+  { reward_title: "Free Pizza Slice", idempotency_key: "seed-redeem-009" },
+  { reward_title: "Mystery Snack Box", idempotency_key: "seed-redeem-010" },
+  { reward_title: "Secret Menu Burger", idempotency_key: "seed-redeem-011" }
+]
+
+user_redemptions_seed.each do |attrs|
+  reward = Reward.find_by!(title: attrs[:reward_title])
+  redemption_key = "seed-user-redemption-#{attrs[:idempotency_key]}"
+
+  redemption = User::Redemption.find_or_initialize_by(user: user, idempotency_key: redemption_key)
+  redemption.update!(
+    reward: reward,
+    points_cost_snapshot: reward.points_cost,
+    status: "completed"
+  )
+
+  redeem_amount = -reward.points_cost
+  running_balance += redeem_amount
+
+  tx = User::PointTransaction.find_or_initialize_by(user: user, idempotency_key: attrs[:idempotency_key])
+  tx.update!(
+    amount: redeem_amount,
+    running_balance: running_balance,
+    kind: "redeem",
+    reason_code: "reward_redemption",
+    reason: "Redeemed #{reward.title}",
+    source: redemption
+  )
+
+  puts "Redemption seeded: #{redemption.id} #{reward.title} (balance: #{running_balance})"
+end
+
+puts "Final seeded points balance: #{running_balance}"
 puts "Seeding complete!"

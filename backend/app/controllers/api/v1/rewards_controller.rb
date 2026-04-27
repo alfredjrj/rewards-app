@@ -5,13 +5,7 @@ class Api::V1::RewardsController < AuthenticationController
   def index
     authorize :reward, :index?
 
-    rewards = policy_scope(::Reward)
-    query = params[:query].presence
-    if query.present?
-      # Use Postgres full-text search (title + description) for better relevance
-      # and index-backed performance; LIKE scans are weaker and slower at scale.
-      rewards = rewards.search_text(query)
-    end
+    rewards = RewardQuery.new(policy_scope(::Reward), params).call
 
     pagy_request = Pagy::Request.new(
       request: request,

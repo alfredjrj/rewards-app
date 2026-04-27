@@ -1,4 +1,6 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { ReactNode, createElement } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useRedemptionsPageState } from "@/hooks/use-redemptions-page-state";
 
@@ -15,6 +17,17 @@ vi.mock("@/services/api", () => ({
 
 describe("useRedemptionsPageState", () => {
   const user = { id: 1, email: "demo@example.com", points_balance: 690 };
+  function createWrapper() {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+      },
+    });
+
+    return function Wrapper({ children }: { children: ReactNode }) {
+      return createElement(QueryClientProvider, { client: queryClient }, children);
+    };
+  }
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -38,7 +51,8 @@ describe("useRedemptionsPageState", () => {
       useRedemptionsPageState({
         user: null,
         authLoading: false,
-      })
+      }),
+      { wrapper: createWrapper() }
     );
 
     await waitFor(() => {
@@ -52,7 +66,8 @@ describe("useRedemptionsPageState", () => {
       useRedemptionsPageState({
         user,
         authLoading: false,
-      })
+      }),
+      { wrapper: createWrapper() }
     );
 
     await waitFor(() => {
@@ -103,7 +118,8 @@ describe("useRedemptionsPageState", () => {
       useRedemptionsPageState({
         user,
         authLoading: false,
-      })
+      }),
+      { wrapper: createWrapper() }
     );
 
     await waitFor(() => {
@@ -130,7 +146,8 @@ describe("useRedemptionsPageState", () => {
       useRedemptionsPageState({
         user,
         authLoading: false,
-      })
+      }),
+      { wrapper: createWrapper() }
     );
 
     await waitFor(() => {

@@ -11,6 +11,14 @@ class Reward < ApplicationRecord
   validates :points_cost, numericality: { greater_than_or_equal_to: 0, only_integer: true }
   validates :reward_type, inclusion: { in: TYPES }
 
+  scope :for_types, ->(types) { where(reward_type: types) if types.present? }
+  scope :by_points_cost, lambda { |min: nil, max: nil|
+    scoped = all
+    scoped = scoped.where("points_cost >= ?", min) if min.present?
+    scoped = scoped.where("points_cost <= ?", max) if max.present?
+    scoped
+  }
+
   pg_search_scope :search_text,
                   against: {
                     title: "A",
