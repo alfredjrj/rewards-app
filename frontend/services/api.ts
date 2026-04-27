@@ -80,9 +80,19 @@ export interface PaginatedResponse<T> {
   };
 }
 
+/** Rewards list uses backend keyset (cursor) pagination — see GET /api/v1/rewards. */
+export interface RewardsPaginatedResponse {
+  data: Reward[];
+  meta: {
+    per_page: number;
+    next_cursor: string | null;
+    has_next: boolean;
+  };
+}
+
 export interface FetchRewardsOptions {
   query?: string;
-  page?: number;
+  cursor?: string;
   perPage?: number;
   rewardTypes?: Reward["reward_type"][];
   minPoints?: number;
@@ -224,8 +234,8 @@ export async function getUserPoints(): Promise<UserPointsPayload> {
 
 export async function fetchRewards(
   options: FetchRewardsOptions = {}
-): Promise<PaginatedResponse<Reward>> {
-  const { query: searchQuery, page, perPage, rewardTypes, minPoints, affordableOnly, maxPoints, sort } = options;
+): Promise<RewardsPaginatedResponse> {
+  const { query: searchQuery, cursor, perPage, rewardTypes, minPoints, affordableOnly, maxPoints, sort } = options;
   const params = new URLSearchParams();
   const normalizedQuery = searchQuery?.trim();
 
@@ -235,12 +245,12 @@ export async function fetchRewards(
   }
   if (typeof minPoints === "number") params.set("filter[points][gte]", String(minPoints));
   if (affordableOnly && typeof maxPoints === "number") params.set("filter[points][lte]", String(maxPoints));
-  if (typeof page === "number") params.set("page", String(page));
+  if (cursor) params.set("cursor", cursor);
   if (typeof perPage === "number") params.set("per_page", String(perPage));
   if (sort) params.set("sort", sort);
 
   const queryString = params.toString() ? `?${params.toString()}` : "";
-  return request<PaginatedResponse<Reward>>(`/api/v1/rewards${queryString}`);
+  return request<RewardsPaginatedResponse>(`/api/v1/rewards${queryString}`);
 }
 
 export async function redeemReward(rewardId: number): Promise<RedemptionResponse> {
