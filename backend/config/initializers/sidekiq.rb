@@ -1,0 +1,11 @@
+# Use a dedicated Redis DB index for this app so Sidekiq Web only
+# shows this project's jobs/metrics, not data from other local apps.
+redis_url = ENV.fetch("REDIS_URL", "redis://localhost:6379/7")
+
+Sidekiq.configure_server do |config|
+  config.redis = { url: redis_url }
+end
+
+Sidekiq.configure_client do |config|
+  config.redis = { url: redis_url }
+end

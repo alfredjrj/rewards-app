@@ -1,7 +1,10 @@
-user = User.find_or_create_by!(email: "demo@example.com") do |u|
-  u.password = "password123"
-  u.password_confirmation = "password123"
-end
+user = User.find_or_initialize_by(email: "demo@example.com")
+user.assign_attributes(
+  password: "password123",
+  password_confirmation: "password123",
+  admin: true
+)
+user.save!
 puts "User created: #{user.email}"
 
 rewards_data = [

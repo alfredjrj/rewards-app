@@ -37,10 +37,23 @@ export default function RewardsPage() {
     onNextPage,
   } = useRewardsPageState({ user, authLoading, setUser });
 
-  if (authLoading) {
+  const showInitialWireframe = authLoading || (!user && isLoading);
+
+  if (showInitialWireframe) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-purple-400 text-sm">Loading…</div>
+      <div className="min-h-screen bg-purple-50">
+        <Navbar />
+        <main className="max-w-6xl mx-auto px-6 py-10">
+          <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div className="space-y-3">
+              <div className="h-10 w-44 rounded-lg bg-purple-100 animate-pulse" />
+              <div className="h-4 w-72 rounded bg-purple-100 animate-pulse" />
+            </div>
+            <div className="h-20 w-72 rounded-2xl bg-teal-100 animate-pulse" />
+          </div>
+          <div className="mb-6 h-36 rounded-2xl bg-white border border-purple-100 shadow-sm animate-pulse" />
+          <RewardsGridSkeleton />
+        </main>
       </div>
     );
   }
@@ -78,7 +91,6 @@ export default function RewardsPage() {
           <RedemptionSuccessBanner
             rewardTitle={redemptionSuccess.rewardTitle}
             pointsSpent={redemptionSuccess.pointsSpent}
-            pointsBalance={redemptionSuccess.pointsBalance}
             onDismiss={() => setRedemptionSuccess(null)}
           />
         )}

@@ -22,10 +22,20 @@ export default function RedemptionsPage() {
     onNextPage,
   } = useRedemptionsPageState({ user, authLoading });
 
-  if (authLoading) {
+  const showInitialWireframe = authLoading || (!user && isLoading);
+
+  if (showInitialWireframe) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-purple-400 text-sm">Loading...</div>
+      <div className="min-h-screen bg-purple-50">
+        <Navbar />
+        <main className="max-w-6xl mx-auto px-6 py-10">
+          <div className="mb-8 space-y-3">
+            <div className="h-10 w-72 rounded-lg bg-purple-100 animate-pulse" />
+            <div className="h-4 w-80 rounded bg-purple-100 animate-pulse" />
+          </div>
+          <div className="mb-6 h-40 rounded-2xl border border-zinc-200 bg-white shadow-sm animate-pulse" />
+          <RedemptionsTableSkeleton />
+        </main>
       </div>
     );
   }

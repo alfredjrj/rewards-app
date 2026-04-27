@@ -57,4 +57,21 @@ describe("LoginPage", () => {
     expect(await screen.findByText("Invalid login")).toBeInTheDocument();
     expect(pushMock).not.toHaveBeenCalled();
   });
+
+  it("shows the Devise invalid-credentials message returned by the API", async () => {
+    // Matches devise.failure.invalid in backend/config/locales/devise.en.yml after I18n interpolation.
+    loginMock.mockRejectedValueOnce(new Error("Invalid Email or password."));
+
+    render(<LoginPage />);
+    fireEvent.change(screen.getByLabelText("Email address"), {
+      target: { value: "demo@example.com" },
+    });
+    fireEvent.change(screen.getByLabelText("Password"), {
+      target: { value: "wrong-password" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+
+    expect(await screen.findByText("Invalid Email or password.")).toBeInTheDocument();
+    expect(pushMock).not.toHaveBeenCalled();
+  });
 });

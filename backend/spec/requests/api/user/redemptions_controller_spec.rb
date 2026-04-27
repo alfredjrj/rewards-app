@@ -126,31 +126,72 @@ RSpec.describe "Api::V1::User::RedemptionsController", type: :request do
         )
       end
 
-      it "creates a redemption and returns updated points balance" do
+      it "enqueues async redemption processing and returns processing state" do
+        key = "406625f1-81c1-43e4-9e74-377e4c6ff31c"
+        allow(User::Redemptions::ProcessJob).to receive(:perform_async)
+
         post "/api/v1/user/redemptions",
              params: { redemption: { reward_id: reward.id } },
-             headers: { "Idempotency-Key" => "406625f1-81c1-43e4-9e74-377e4c6ff31c" }
+             headers: { "Idempotency-Key" => key }
 
-        expect(response).to have_http_status(:created)
+        expect(User::Redemptions::ProcessJob).to have_received(:perform_async).with(
+          user.id,
+          reward.id,
+          key
+        )
+
+        expect(response).to have_http_status(:accepted)
         body = JSON.parse(response.body)
-        expect(body["data"]).to include(
+        expect(body["data"]).to eq(
+          "request_id" => key,
           "reward_id" => reward.id,
-          "points_cost_snapshot" => 100,
-          "status" => "completed",
-          "points_balance" => 200
+          "status" => "processing"
+        )
+      end
+    end
+  end
+
+  describe "GET /api/v1/user/redemptions/:id" do
+    context "when signed in" do
+      let(:user) { create(:user) }
+
+      before do
+        sign_in user
+      end
+
+      it "returns processing when request is still pending" do
+        get "/api/v1/user/redemptions/pending-123"
+
+        expect(response).to have_http_status(:ok)
+        expect(JSON.parse(response.body)).to eq(
+          "data" => {
+            "request_id" => "pending-123",
+            "status" => "processing"
+          }
         )
       end
 
-      it "returns an error when balance is insufficient" do
-        reward.update!(points_cost: 999)
+      it "returns completed when redemption exists for request id" do
+        reward = create(:reward)
+        redemption = create(
+          :user_redemption,
+          user: user,
+          reward: reward,
+          idempotency_key: "done-123"
+        )
 
-        post "/api/v1/user/redemptions",
-             params: { redemption: { reward_id: reward.id } },
-             headers: { "Idempotency-Key" => "cfd6fc99-884b-4c32-aa13-052f1469417d" }
+        get "/api/v1/user/redemptions/done-123"
 
-        expect(response).to have_http_status(:unprocessable_entity)
-        body = JSON.parse(response.body)
-        expect(body["error"]["code"]).to eq("insufficient_balance")
+        expect(response).to have_http_status(:ok)
+        expect(JSON.parse(response.body)).to eq(
+          "data" => {
+            "request_id" => "done-123",
+            "id" => redemption.id,
+            "reward_id" => reward.id,
+            "points_cost_snapshot" => reward.points_cost,
+            "status" => "completed"
+          }
+        )
       end
     end
   end

@@ -74,6 +74,14 @@ describe("RedemptionsPage", () => {
     expect(getUserRedemptionsMock).not.toHaveBeenCalled();
   });
 
+  it("shows full-page wireframe while auth is loading", () => {
+    authState = { user: null, loading: true };
+    renderWithQueryClient(<RedemptionsPage />);
+
+    expect(screen.getByTestId("navbar")).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "Loading redemption history" })).toBeInTheDocument();
+  });
+
   it("renders redemption rows and pagination meta", async () => {
     renderWithQueryClient(<RedemptionsPage />);
 

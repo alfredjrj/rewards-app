@@ -93,6 +93,19 @@ describe("RewardsPage", () => {
     expect(fetchRewardsMock).not.toHaveBeenCalled();
   });
 
+  it("shows full-page wireframe while auth is loading", () => {
+    authState = {
+      user: null,
+      loading: true,
+      setUser: setUserMock,
+    };
+
+    renderWithQueryClient(<RewardsPage />);
+
+    expect(screen.getByTestId("navbar")).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "Loading rewards" })).toBeInTheDocument();
+  });
+
   it("renders rewards and pagination meta for authenticated users", async () => {
     renderWithQueryClient(<RewardsPage />);
 
@@ -301,7 +314,7 @@ describe("RewardsPage", () => {
 
     expect(await screen.findByText("Thanks, you are all set.")).toBeInTheDocument();
     expect(screen.getByText(/You redeemed/)).toBeInTheDocument();
-    expect(screen.getByText(/new balance is/)).toBeInTheDocument();
+    expect(screen.queryByText(/new balance is/i)).not.toBeInTheDocument();
     expect(redeemRewardMock).toHaveBeenCalledWith(1);
     expect(setUserMock).toHaveBeenCalledWith({
       id: 1,

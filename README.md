@@ -15,10 +15,17 @@ A full-stack rewards redemption application with a Rails API backend and Next.js
 - Ruby 3.4.3 (via rbenv recommended)
 - Node.js 18+
 - PostgreSQL running locally
+- Redis running locally
 
 ---
 
 ## Setup & Running
+
+### Terminal 0 — Redis (durable mode)
+
+```bash
+redis-server backend/config/redis.conf
+```
 
 ### Terminal 1 — Backend
 
@@ -29,7 +36,14 @@ rails db:setup      # creates DB, runs migrations, seeds data
 rails s -p 3001
 ```
 
-### Terminal 2 — Frontend
+### Terminal 2 — Sidekiq worker
+
+```bash
+cd backend
+bundle exec sidekiq
+```
+
+### Terminal 3 — Frontend
 
 ```bash
 cd frontend
@@ -50,6 +64,21 @@ NEXT_PUBLIC_API_URL=http://localhost:3001
 ```
 
 This file is included with the safe development default.
+
+### Backend (`backend/.env` or shell env)
+
+```
+REDIS_URL=redis://localhost:6379/7
+```
+
+Use a dedicated DB index (like `/7`) per app to avoid seeing Sidekiq data
+from other projects in `/sidekiq`.
+
+For high durability in local Redis, start it with:
+
+```bash
+redis-server backend/config/redis.conf
+```
 
 ---
 
@@ -90,6 +119,8 @@ No tokens are stored in `localStorage`. Auth state lives entirely in the server-
 - Authenticated users can view and search available rewards.
 - Reward listing supports page-based pagination for predictable page navigation.
 - Redemption operations must validate business rules (for example: reward availability and sufficient points) before creating a redemption record.
+- Redemption creation runs asynchronously (Sidekiq + Redis): the API returns `202 Accepted` with `processing`, then completion is delivered over Action Cable.
+- Frontend keeps a polling fallback against `GET /api/v1/user/redemptions/:id` so users do not get stuck if websocket delivery is missed.
 
 ---
 

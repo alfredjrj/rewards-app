@@ -3,14 +3,12 @@
 type RedemptionSuccessBannerProps = {
   rewardTitle: string;
   pointsSpent: number;
-  pointsBalance: number;
   onDismiss: () => void;
 };
 
 export default function RedemptionSuccessBanner({
   rewardTitle,
   pointsSpent,
-  pointsBalance,
   onDismiss,
 }: RedemptionSuccessBannerProps) {
   return (
@@ -21,9 +19,6 @@ export default function RedemptionSuccessBanner({
           <h2 className="mt-1 text-xl font-semibold">Thanks, you are all set.</h2>
           <p className="mt-2 text-sm text-zinc-200">
             You redeemed <span className="font-semibold text-white">{rewardTitle}</span> for {pointsSpent} points.
-          </p>
-          <p className="mt-1 text-sm text-zinc-200">
-            Your new balance is <span className="font-semibold text-white">{pointsBalance}</span>.
           </p>
         </div>
         <button

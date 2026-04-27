@@ -9,7 +9,6 @@ describe("RedemptionSuccessBanner", () => {
       <RedemptionSuccessBanner
         rewardTitle="Free Coffee"
         pointsSpent={100}
-        pointsBalance={590}
         onDismiss={vi.fn()}
       />
     );
@@ -17,7 +16,7 @@ describe("RedemptionSuccessBanner", () => {
     expect(screen.getByText("Thanks, you are all set.")).toBeInTheDocument();
     expect(screen.getByText(/You redeemed/)).toBeInTheDocument();
     expect(screen.getByText(/Free Coffee/)).toBeInTheDocument();
-    expect(screen.getByText(/new balance is/)).toBeInTheDocument();
+    expect(screen.queryByText(/new balance is/i)).not.toBeInTheDocument();
   });
 
   it("calls dismiss callback", async () => {
@@ -28,7 +27,6 @@ describe("RedemptionSuccessBanner", () => {
       <RedemptionSuccessBanner
         rewardTitle="Free Coffee"
         pointsSpent={100}
-        pointsBalance={590}
         onDismiss={onDismiss}
       />
     );

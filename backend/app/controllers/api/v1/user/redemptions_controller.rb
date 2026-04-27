@@ -28,34 +28,58 @@ class Api::V1::User::RedemptionsController < AuthenticationController
     authorize :redemption, :create?
 
     idempotency_key = request.headers["Idempotency-Key"].presence || SecureRandom.uuid
-    result = ::User::Redemptions::Create.call(
-      user: current_user,
-      reward: reward,
-      idempotency_key: idempotency_key
-    )
+    User::Redemptions::ProcessJob.perform_async(current_user.id, reward.id, idempotency_key)
 
-    if result.success?
-      render json: {
-        data: ::Api::V1::User::RedemptionSerializer.call(
-          redemption: result.redemption,
-          points_balance: result.points_balance
-        )
-      }, status: :created
+    render json: ::Api::V1::User::RedemptionSerializer::Status.call(
+      request_id: idempotency_key,
+      reward_id: reward.id,
+      status: "processing"
+    ), status: :accepted
+  end
+
+  def show
+    authorize :redemption, :index?
+
+    request_id = params[:id].to_s
+
+    # Polling fallback for async redemptions:
+    # ProcessJob writes request-scoped status to cache and broadcasts via Action Cable.
+    # We read cache first for fast completion/failure lookup, then fall back to DB
+    # (idempotency_key match) when cache is missing/expired.
+    cached_status = Rails.cache.read(cache_key_for(request_id))
+    if cached_status.present?
+      payload = cached_status.to_h.stringify_keys
+      render json: ::Api::V1::User::RedemptionSerializer::Status.call(
+        request_id: payload["request_id"] || request_id,
+        status: payload["status"],
+        reward_id: payload["reward_id"],
+        error: payload["error"]
+      )
       return
     end
 
-    status = case result.error[:code]
-    when "insufficient_balance", "reward_unavailable"
-      :unprocessable_entity
-    else
-      :unprocessable_entity
+    redemption = current_user.redemptions.find_by(idempotency_key: request_id)
+    if redemption
+      render json: ::Api::V1::User::RedemptionSerializer::Status.call(
+        request_id: request_id,
+        status: "completed",
+        redemption: redemption
+      )
+      return
     end
 
-    render json: { error: result.error }, status: status
+    render json: ::Api::V1::User::RedemptionSerializer::Status.call(
+      request_id: request_id,
+      status: "processing"
+    )
   end
 
   private
   def redemption_params
     params.require(:redemption).permit(:reward_id)
+  end
+
+  def cache_key_for(request_id)
+    "redemption_request_status:user:#{current_user.id}:#{request_id}"
   end
 end

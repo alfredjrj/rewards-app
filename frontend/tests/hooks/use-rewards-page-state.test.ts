@@ -7,6 +7,14 @@ import { useRewardsPageState } from "@/hooks/use-rewards-page-state";
 const replaceMock = vi.fn();
 const fetchRewardsMock = vi.fn();
 const redeemRewardMock = vi.fn();
+const getRedemptionStatusMock = vi.fn();
+const getUserPointsMock = vi.fn();
+const unsubscribeMock = vi.fn();
+let cableReceivedHandler: ((payload: unknown) => void) | undefined;
+const cableCreateMock = vi.fn((_identifier: unknown, callbacks: { received?: (payload: unknown) => void }) => {
+  cableReceivedHandler = callbacks?.received;
+  return { unsubscribe: unsubscribeMock };
+});
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: replaceMock }),
@@ -15,6 +23,17 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/services/api", () => ({
   fetchRewards: (...args: unknown[]) => fetchRewardsMock(...args),
   redeemReward: (...args: unknown[]) => redeemRewardMock(...args),
+  getRedemptionStatus: (...args: unknown[]) => getRedemptionStatusMock(...args),
+  getUserPoints: (...args: unknown[]) => getUserPointsMock(...args),
+}));
+
+vi.mock("@/lib/cable", () => ({
+  getCableConsumer: () => ({
+    subscriptions: {
+      create: (identifier: unknown, callbacks: { received?: (payload: unknown) => void }) =>
+        cableCreateMock(identifier, callbacks),
+    },
+  }),
 }));
 
 describe("useRewardsPageState", () => {
@@ -50,12 +69,18 @@ describe("useRewardsPageState", () => {
     });
     redeemRewardMock.mockResolvedValue({
       data: {
-        id: 10,
         reward_id: 1,
-        points_cost_snapshot: 100,
-        status: "completed",
-        points_balance: 590,
+        status: "processing",
+        request_id: "req-1",
       },
+    });
+    getRedemptionStatusMock.mockResolvedValue({
+      request_id: "req-1",
+      reward_id: 1,
+      status: "completed",
+    });
+    getUserPointsMock.mockResolvedValue({
+      points_balance: 590,
     });
   });
 
@@ -135,7 +160,7 @@ describe("useRewardsPageState", () => {
     expect(result.current.page).toBe(1);
   });
 
-  it("confirms redemption and updates success state", async () => {
+  it("starts processing flow and updates success on cable completion", async () => {
     const { result } = renderHook(() =>
       useRewardsPageState({
         user,
@@ -159,15 +184,30 @@ describe("useRewardsPageState", () => {
     });
 
     expect(redeemRewardMock).toHaveBeenCalledWith(1);
-    expect(setUserMock).toHaveBeenCalledWith({
-      id: 1,
-      email: "demo@example.com",
-      points_balance: 590,
+    act(() => {
+      cableReceivedHandler?.({
+        request_id: "req-1",
+        reward_id: 1,
+        status: "completed",
+      });
+    });
+
+    await waitFor(() => {
+      expect(result.current.redemptionSuccess).toEqual({
+        rewardTitle: "Free Coffee",
+        pointsSpent: 100,
+        pointsBalance: 590,
+      });
     });
     expect(result.current.redemptionSuccess).toEqual({
       rewardTitle: "Free Coffee",
       pointsSpent: 100,
       pointsBalance: 590,
+    });
+    expect(setUserMock).toHaveBeenCalledWith({
+      id: 1,
+      email: "demo@example.com",
+      points_balance: 590,
     });
     expect(result.current.pendingReward).toBeNull();
   });

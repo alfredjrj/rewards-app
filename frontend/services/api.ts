@@ -31,11 +31,24 @@ export interface Reward {
 
 export interface RedemptionResponse {
   data: {
-    id: number;
+    id?: number;
+    request_id?: string;
     reward_id: number;
-    points_cost_snapshot: number;
+    points_cost_snapshot?: number;
     status: string;
-    points_balance: number;
+    points_balance?: number;
+  };
+}
+
+export interface RedemptionStatusResponse {
+  data: {
+    request_id: string;
+    reward_id?: number;
+    status: "processing" | "completed" | "failed";
+    error?: {
+      code: string;
+      message: string;
+    };
   };
 }
 
@@ -83,7 +96,7 @@ function parseErrorMessage(data: unknown): string {
 
   const payload = data as {
     error?: string | { message?: string };
-    errors?: Array<string | { message?: string }>;
+    errors?: Array<string | { message?: string }> | Record<string, string[]>;
   };
 
   if (typeof payload.error === "string" && payload.error.trim()) {
@@ -99,17 +112,27 @@ function parseErrorMessage(data: unknown): string {
     return payload.error.message;
   }
 
-  const firstError = payload.errors?.[0];
-  if (typeof firstError === "string" && firstError.trim()) {
-    return firstError;
+  if (Array.isArray(payload.errors)) {
+    const firstError = payload.errors[0];
+    if (typeof firstError === "string" && firstError.trim()) {
+      return firstError;
+    }
+    if (
+      firstError &&
+      typeof firstError === "object" &&
+      typeof firstError.message === "string" &&
+      firstError.message.trim()
+    ) {
+      return firstError.message;
+    }
   }
-  if (
-    firstError &&
-    typeof firstError === "object" &&
-    typeof firstError.message === "string" &&
-    firstError.message.trim()
-  ) {
-    return firstError.message;
+
+  if (payload.errors && typeof payload.errors === "object" && !Array.isArray(payload.errors)) {
+    const firstKey = Object.keys(payload.errors)[0];
+    const msgs = firstKey ? payload.errors[firstKey] : undefined;
+    if (Array.isArray(msgs) && typeof msgs[0] === "string" && msgs[0].trim()) {
+      return msgs[0];
+    }
   }
 
   return "Request failed";
@@ -233,6 +256,13 @@ export async function redeemReward(rewardId: number): Promise<RedemptionResponse
       "Idempotency-Key": key,
     },
   });
+}
+
+export async function getRedemptionStatus(requestId: string): Promise<RedemptionStatusResponse["data"]> {
+  const payload = await request<RedemptionStatusResponse>(
+    `/api/v1/user/redemptions/${encodeURIComponent(requestId)}`
+  );
+  return payload.data;
 }
 
 export async function getUserRedemptions(options: GetUserRedemptionsOptions = {}): Promise<PaginatedResponse<RedemptionHistoryItem>> {

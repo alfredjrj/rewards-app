@@ -36,6 +36,18 @@ describe("services/api", () => {
     );
   });
 
+  it("throws backend error message for failed login", async () => {
+    const { login } = await import("@/services/api");
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      headers: { get: () => "application/json" },
+      json: async () => ({ error: "Invalid Email or password." }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(login("demo@example.com", "wrong-password")).rejects.toThrow("Invalid Email or password.");
+  });
+
   it("throws backend error message for failed current-user request", async () => {
     const { getCurrentUser } = await import("@/services/api");
     const fetchMock = vi.fn().mockResolvedValue({

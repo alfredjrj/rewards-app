@@ -14,11 +14,12 @@ RSpec.describe "db/seeds.rb" do
     redeem_transactions = point_transactions.where(kind: "redeem")
 
     expect(user).to be_present
+    expect(user.admin).to be(true)
     expect(Reward.count).to eq(25)
     expect(redemptions.count).to eq(11)
     expect(point_transactions.count).to eq(15)
     expect(redeem_transactions.count).to eq(11)
-    expect(point_transactions.last.running_balance).to eq(310)
+    expect(point_transactions.last.running_balance).to eq(810)
     expect(redeem_transactions.pluck(:source_type).uniq).to eq([ "User::Redemption" ])
     expect(
       redeem_transactions.pluck(:source_id).sort
