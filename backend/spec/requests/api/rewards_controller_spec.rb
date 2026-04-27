@@ -27,10 +27,11 @@ RSpec.describe "Api::V1::RewardsController", type: :request do
         body = JSON.parse(response.body)
         expect(body["data"].map { |r| r["title"] }).to eq([ "Coffee Voucher", "Movie Ticket" ])
         expect(body["meta"]).to include(
-          "per_page" => 10,
-          "has_next" => false
+          "page" => 1,
+          "per_page" => 6,
+          "total_count" => 2,
+          "total_pages" => 1
         )
-        expect(body["meta"]["next_cursor"]).to be_nil
       end
 
       it "searches across title and description using full-text search" do
@@ -56,36 +57,22 @@ RSpec.describe "Api::V1::RewardsController", type: :request do
         expect(body["data"].map { |r| r["title"] }).to include("Chef Special")
       end
 
-      it "supports cursor-based pagination" do
+      it "supports page-based pagination" do
         create(:reward, title: "Alpha")
         create(:reward, title: "Bravo")
         create(:reward, title: "Charlie")
         create(:reward, title: "Delta")
 
-        get "/api/v1/rewards", params: { per_page: 2 }
-
-        expect(response).to have_http_status(:ok)
-        body = JSON.parse(response.body)
-        expect(body["data"].map { |r| r["title"] }).to eq([ "Alpha", "Bravo" ])
-        expect(body["meta"]).to include(
-          "per_page" => 2,
-          "has_next" => true
-        )
-        cursor = body["meta"]["next_cursor"]
-        expect(cursor).to be_present
-
-        # Devise session cookies are not always preserved across sequential GETs in
-        # request specs; re-sign-in keeps the second request authenticated.
-        sign_in user
-
-        get "/api/v1/rewards", params: { per_page: 2, cursor: cursor }
+        get "/api/v1/rewards", params: { page: 2, per_page: 2 }
 
         expect(response).to have_http_status(:ok)
         body = JSON.parse(response.body)
         expect(body["data"].map { |r| r["title"] }).to eq([ "Charlie", "Delta" ])
         expect(body["meta"]).to include(
+          "page" => 2,
           "per_page" => 2,
-          "has_next" => false
+          "total_count" => 4,
+          "total_pages" => 2
         )
       end
 

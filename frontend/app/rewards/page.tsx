@@ -9,7 +9,7 @@ import {
 import RewardsGridSkeleton from "@/components/rewards/rewards-grid-skeleton";
 import RedeemConfirmationModal from "@/components/rewards/redeem-confirmation-modal";
 import RedemptionSuccessBanner from "@/components/rewards/redemption-success-banner";
-import { REWARDS_PAGE_SIZE, useRewardsPageState } from "@/hooks/use-rewards-page-state";
+import { useRewardsPageState } from "@/hooks/use-rewards-page-state";
 
 export default function RewardsPage() {
   const { user, loading: authLoading, setUser } = useAuth();
@@ -20,9 +20,9 @@ export default function RewardsPage() {
     query,
     selectedRewardTypes,
     affordableOnly,
-    hasNextPage,
-    isFetchingNextPage,
-    bottomSentinelRef,
+    page,
+    totalPages,
+    totalCount,
     redeemingId,
     pendingReward,
     redemptionSuccess,
@@ -33,6 +33,8 @@ export default function RewardsPage() {
     onSearchChange,
     toggleRewardType,
     onAffordableOnlyChange,
+    onPreviousPage,
+    onNextPage,
   } = useRewardsPageState({ user, authLoading, setUser });
 
   const showInitialWireframe = authLoading || (!user && isLoading);
@@ -166,7 +168,6 @@ export default function RewardsPage() {
         {error && <div className="text-red-600 bg-red-50 border border-red-200 rounded-xl p-4">{error}</div>}
 
         {!isLoading && !error && (
-          <>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             {rewards.map((reward) => {
               const typeMeta = getRewardTypeMeta(reward.reward_type);
@@ -218,17 +219,32 @@ export default function RewardsPage() {
               </div>
             )}
           </div>
+        )}
 
-          <div ref={bottomSentinelRef} className="h-px w-full" aria-hidden />
-          {isFetchingNextPage && (
-            <div className="mt-5" role="status" aria-live="polite" aria-label="Loading more rewards">
-              <RewardsGridSkeleton count={REWARDS_PAGE_SIZE} announce={false} />
+        {!isLoading && !error && totalCount > 0 && (
+          <div className="mt-6 flex items-center justify-between bg-white rounded-2xl border border-purple-100 p-4">
+            <p className="text-sm text-gray-600">
+              Page {page} of {totalPages} ({totalCount} rewards)
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={onPreviousPage}
+                disabled={page <= 1}
+                className="px-4 py-2 rounded-lg border border-gray-200 text-sm disabled:opacity-50"
+              >
+                Previous
+              </button>
+              <button
+                type="button"
+                onClick={onNextPage}
+                disabled={page >= totalPages}
+                className="px-4 py-2 rounded-lg border border-gray-200 text-sm disabled:opacity-50"
+              >
+                Next
+              </button>
             </div>
-          )}
-          {!hasNextPage && rewards.length > 0 && (
-            <p className="mt-4 text-center text-sm text-gray-500">You&apos;ve reached the end.</p>
-          )}
-          </>
+          </div>
         )}
       </main>
     </div>

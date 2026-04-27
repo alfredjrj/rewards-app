@@ -65,7 +65,7 @@ describe("useRewardsPageState", () => {
     vi.clearAllMocks();
     fetchRewardsMock.mockResolvedValue({
       data: [reward],
-      meta: { per_page: 10, next_cursor: null, has_next: false },
+      meta: { page: 1, per_page: 6, total_count: 1, total_pages: 1 },
     });
     redeemRewardMock.mockResolvedValue({
       data: {
@@ -89,13 +89,12 @@ describe("useRewardsPageState", () => {
   });
 
   it("redirects to login when user is not authenticated", async () => {
-    renderHook(
-      () =>
-        useRewardsPageState({
-          user: null,
-          authLoading: false,
-          setUser: setUserMock,
-        }),
+    renderHook(() =>
+      useRewardsPageState({
+        user: null,
+        authLoading: false,
+        setUser: setUserMock,
+      }),
       { wrapper: createWrapper() }
     );
 
@@ -106,13 +105,12 @@ describe("useRewardsPageState", () => {
   });
 
   it("fetches rewards and exposes response metadata", async () => {
-    const { result } = renderHook(
-      () =>
-        useRewardsPageState({
-          user,
-          authLoading: false,
-          setUser: setUserMock,
-        }),
+    const { result } = renderHook(() =>
+      useRewardsPageState({
+        user,
+        authLoading: false,
+        setUser: setUserMock,
+      }),
       { wrapper: createWrapper() }
     );
 
@@ -122,31 +120,33 @@ describe("useRewardsPageState", () => {
 
     expect(fetchRewardsMock).toHaveBeenCalledWith({
       query: "",
-      perPage: 10,
+      page: 1,
+      perPage: 6,
       rewardTypes: [],
       affordableOnly: false,
       maxPoints: 690,
     });
     expect(result.current.rewards).toEqual([reward]);
-    expect(result.current.hasNextPage).toBe(false);
+    expect(result.current.totalPages).toBe(1);
+    expect(result.current.totalCount).toBe(1);
     expect(result.current.status).toBe("success");
   });
 
   it("updates query when search changes", async () => {
-    const { result } = renderHook(
-      () =>
-        useRewardsPageState({
-          user,
-          authLoading: false,
-          setUser: setUserMock,
-        }),
+    const { result } = renderHook(() =>
+      useRewardsPageState({
+        user,
+        authLoading: false,
+        setUser: setUserMock,
+      }),
       { wrapper: createWrapper() }
     );
 
     await waitFor(() => {
       expect(fetchRewardsMock).toHaveBeenCalledWith({
         query: "",
-        perPage: 10,
+        page: 1,
+        perPage: 6,
         rewardTypes: [],
         affordableOnly: false,
         maxPoints: 690,
@@ -157,16 +157,16 @@ describe("useRewardsPageState", () => {
     });
 
     expect(result.current.query).toBe("vip");
+    expect(result.current.page).toBe(1);
   });
 
   it("starts processing flow and updates success on cable completion", async () => {
-    const { result } = renderHook(
-      () =>
-        useRewardsPageState({
-          user,
-          authLoading: false,
-          setUser: setUserMock,
-        }),
+    const { result } = renderHook(() =>
+      useRewardsPageState({
+        user,
+        authLoading: false,
+        setUser: setUserMock,
+      }),
       { wrapper: createWrapper() }
     );
 

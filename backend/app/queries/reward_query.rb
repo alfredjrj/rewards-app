@@ -1,12 +1,6 @@
 class RewardQuery < BaseQuery
   ALLOWED_REWARD_TYPES = %w[free_item vip_experience secret_menu].freeze
 
-  # Default listing order: id matches creation order for serial PKs and keeps the
-  # Pagy keyset cursor as a single integer (JSON round-trips exactly). Composite
-  # cursors that include timestamps can misbehave across requests when ISO time
-  # in the cursor does not match DB microsecond precision.
-  DEFAULT_SORT = { id: :asc }.freeze
-
   FILTERABLE = {
     "query" => :filter_query,
     "reward_types" => :filter_reward_types
@@ -24,19 +18,6 @@ class RewardQuery < BaseQuery
     "points_cost" => %i[asc desc],
     "created_at" => %i[asc desc]
   }.freeze
-
-  def apply_sort(current_scope)
-    field, direction = sort_parts
-
-    if field.blank? || direction.nil?
-      return current_scope.reorder(DEFAULT_SORT)
-    end
-
-    allowed_directions = self.class::SORTABLE[field]
-    return current_scope unless allowed_directions&.include?(direction)
-
-    current_scope.reorder(field => direction, id: direction)
-  end
 
   private
 

@@ -78,36 +78,8 @@ describe("RewardsPage", () => {
           is_available: true,
         },
       ],
-      meta: { per_page: 10, next_cursor: null, has_next: false },
+      meta: { page: 1, per_page: 6, total_count: 13, total_pages: 3 },
     });
-
-    vi.stubGlobal(
-      "IntersectionObserver",
-      class IntersectionObserverMock {
-        constructor(private readonly callback: IntersectionObserverCallback) {}
-
-        observe(el: Element) {
-          queueMicrotask(() => {
-            this.callback(
-              [{ isIntersecting: true, target: el } as IntersectionObserverEntry],
-              this as unknown as IntersectionObserver
-            );
-          });
-        }
-
-        disconnect() {}
-
-        unobserve() {}
-
-        takeRecords() {
-          return [];
-        }
-
-        root: Element | null = null;
-        rootMargin = "";
-        thresholds: ReadonlyArray<number> = [];
-      }
-    );
   });
 
   it("redirects to login when user is not authenticated", async () => {
@@ -134,16 +106,17 @@ describe("RewardsPage", () => {
     expect(screen.getByRole("status", { name: "Loading rewards" })).toBeInTheDocument();
   });
 
-  it("renders rewards for authenticated users with infinite scroll affordances", async () => {
+  it("renders rewards and pagination meta for authenticated users", async () => {
     renderWithQueryClient(<RewardsPage />);
 
     expect(await screen.findByText("Free Coffee")).toBeInTheDocument();
-    expect(screen.getByText(/You've reached the end/i)).toBeInTheDocument();
+    expect(screen.getByText("Page 1 of 3 (13 rewards)")).toBeInTheDocument();
     expect(screen.getByText("Available points")).toBeInTheDocument();
     expect(screen.getByText("690 pts")).toBeInTheDocument();
     expect(fetchRewardsMock).toHaveBeenCalledWith({
       query: "",
-      perPage: 10,
+      page: 1,
+      perPage: 6,
       rewardTypes: [],
       affordableOnly: false,
       maxPoints: 690,
@@ -161,7 +134,7 @@ describe("RewardsPage", () => {
   it("handles malformed payload data without crashing", async () => {
     fetchRewardsMock.mockResolvedValue({
       data: { bad: "shape" },
-      meta: { per_page: 10, next_cursor: null, has_next: false },
+      meta: { page: 1, per_page: 6, total_count: 0, total_pages: 1 },
     });
 
     renderWithQueryClient(<RewardsPage />);
@@ -169,10 +142,10 @@ describe("RewardsPage", () => {
     expect(await screen.findByText("No rewards match your search.")).toBeInTheDocument();
   });
 
-  it("loads the next page when the scroll sentinel intersects", async () => {
+  it("moves to the next page when pagination button is clicked", async () => {
     fetchRewardsMock.mockImplementation(
-      async (params: { query?: string; cursor?: string; perPage?: number }) => {
-        if (params.cursor === "next-page-token") {
+      async (params: { query?: string; page?: number; perPage?: number }) => {
+        if (params.page === 2) {
           return {
             data: [
               {
@@ -184,7 +157,7 @@ describe("RewardsPage", () => {
                 is_available: true,
               },
             ],
-            meta: { per_page: 10, next_cursor: null, has_next: false },
+            meta: { page: 2, per_page: 6, total_count: 13, total_pages: 3 },
           };
         }
 
@@ -199,67 +172,7 @@ describe("RewardsPage", () => {
               is_available: true,
             },
           ],
-          meta: { per_page: 10, next_cursor: "next-page-token", has_next: true },
-        };
-      }
-    );
-
-    renderWithQueryClient(<RewardsPage />);
-
-    expect(await screen.findByText("Free Coffee")).toBeInTheDocument();
-
-    await waitFor(() => {
-      expect(fetchRewardsMock).toHaveBeenCalledWith({
-        query: "",
-        cursor: "next-page-token",
-        perPage: 10,
-        rewardTypes: [],
-        affordableOnly: false,
-        maxPoints: 690,
-      });
-    });
-
-    expect(await screen.findByText("VIP Lounge Pass")).toBeInTheDocument();
-  });
-
-  it("resets the list and applies search query after debounce", async () => {
-    fetchRewardsMock.mockImplementation(
-      async (params: { query?: string; cursor?: string; perPage?: number }) => {
-        if (params.query === "vip") {
-          return {
-            data: [],
-            meta: { per_page: 10, next_cursor: null, has_next: false },
-          };
-        }
-
-        if (params.cursor === "next-page-token") {
-          return {
-            data: [
-              {
-                id: 2,
-                title: "VIP Lounge Pass",
-                description: "Access to the VIP lounge.",
-                points_cost: 900,
-                reward_type: "vip_experience",
-                is_available: true,
-              },
-            ],
-            meta: { per_page: 10, next_cursor: null, has_next: false },
-          };
-        }
-
-        return {
-          data: [
-            {
-              id: 1,
-              title: "Free Coffee",
-              description: "Redeem for one free coffee.",
-              points_cost: 100,
-              reward_type: "free_item",
-              is_available: true,
-            },
-          ],
-          meta: { per_page: 10, next_cursor: "next-page-token", has_next: true },
+          meta: { page: 1, per_page: 6, total_count: 13, total_pages: 3 },
         };
       }
     );
@@ -269,11 +182,73 @@ describe("RewardsPage", () => {
 
     expect(await screen.findByText("Free Coffee")).toBeInTheDocument();
 
+    await user.click(screen.getByRole("button", { name: "Next" }));
+
     await waitFor(() => {
       expect(fetchRewardsMock).toHaveBeenCalledWith({
         query: "",
-        cursor: "next-page-token",
-        perPage: 10,
+        page: 2,
+        perPage: 6,
+        rewardTypes: [],
+        affordableOnly: false,
+        maxPoints: 690,
+      });
+    });
+  });
+
+  it("resets to page 1 and applies search query", async () => {
+    fetchRewardsMock.mockImplementation(
+      async (params: { query?: string; page?: number; perPage?: number }) => {
+        if (params.query === "vip") {
+          return {
+            data: [],
+            meta: { page: 1, per_page: 6, total_count: 0, total_pages: 1 },
+          };
+        }
+
+        if (params.page === 2) {
+          return {
+            data: [
+              {
+                id: 2,
+                title: "VIP Lounge Pass",
+                description: "Access to the VIP lounge.",
+                points_cost: 900,
+                reward_type: "vip_experience",
+                is_available: true,
+              },
+            ],
+            meta: { page: 2, per_page: 6, total_count: 13, total_pages: 3 },
+          };
+        }
+
+        return {
+          data: [
+            {
+              id: 1,
+              title: "Free Coffee",
+              description: "Redeem for one free coffee.",
+              points_cost: 100,
+              reward_type: "free_item",
+              is_available: true,
+            },
+          ],
+          meta: { page: 1, per_page: 6, total_count: 13, total_pages: 3 },
+        };
+      }
+    );
+
+    const user = userEvent.setup();
+    renderWithQueryClient(<RewardsPage />);
+
+    expect(await screen.findByText("Free Coffee")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await waitFor(() => {
+      expect(fetchRewardsMock).toHaveBeenLastCalledWith({
+        query: "",
+        page: 2,
+        perPage: 6,
         rewardTypes: [],
         affordableOnly: false,
         maxPoints: 690,
@@ -282,18 +257,16 @@ describe("RewardsPage", () => {
 
     await user.type(screen.getByLabelText("Search rewards"), "vip");
 
-    await waitFor(
-      () => {
-        expect(fetchRewardsMock).toHaveBeenCalledWith({
-          query: "vip",
-          perPage: 10,
-          rewardTypes: [],
-          affordableOnly: false,
-          maxPoints: 690,
-        });
-      },
-      { timeout: 3000 }
-    );
+    await waitFor(() => {
+      expect(fetchRewardsMock).toHaveBeenLastCalledWith({
+        query: "vip",
+        page: 1,
+        perPage: 6,
+        rewardTypes: [],
+        affordableOnly: false,
+        maxPoints: 690,
+      });
+    });
   });
 
   it("applies reward type and affordability filters", async () => {
@@ -306,7 +279,8 @@ describe("RewardsPage", () => {
     await waitFor(() => {
       expect(fetchRewardsMock).toHaveBeenLastCalledWith({
         query: "",
-        perPage: 10,
+        page: 1,
+        perPage: 6,
         rewardTypes: ["vip_experience"],
         affordableOnly: false,
         maxPoints: 690,
@@ -317,7 +291,8 @@ describe("RewardsPage", () => {
     await waitFor(() => {
       expect(fetchRewardsMock).toHaveBeenLastCalledWith({
         query: "",
-        perPage: 10,
+        page: 1,
+        perPage: 6,
         rewardTypes: ["vip_experience"],
         affordableOnly: true,
         maxPoints: 690,
@@ -347,4 +322,5 @@ describe("RewardsPage", () => {
       points_balance: 590,
     });
   });
+
 });

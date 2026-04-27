@@ -1,27 +1,14 @@
 "use client";
 
-type RewardsGridSkeletonProps = {
-  /** Skeleton cards to render (initial load defaults to 6; infinite scroll often matches page size). */
-  count?: number;
-  /** When false, omit grid-level role/label — wrap the parent when announcing “loading more”. */
-  announce?: boolean;
-};
-
-export default function RewardsGridSkeleton({ count = 6, announce = true }: RewardsGridSkeletonProps) {
-  const n = Math.min(Math.max(count, 1), 24);
-
+export default function RewardsGridSkeleton() {
   return (
     <div
       className="grid grid-cols-1 md:grid-cols-2 gap-5"
-      {...(announce
-        ? {
-            role: "status" as const,
-            "aria-label": "Loading rewards",
-            "aria-live": "polite" as const,
-          }
-        : { "aria-hidden": true })}
+      role="status"
+      aria-label="Loading rewards"
+      aria-live="polite"
     >
-      {Array.from({ length: n }).map((_, idx) => (
+      {Array.from({ length: 6 }).map((_, idx) => (
         <div
           key={idx}
           className="bg-white rounded-2xl border border-purple-100 shadow-sm p-6 animate-pulse"

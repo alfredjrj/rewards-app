@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchRewards, getRedemptionStatus, getUserPoints, redeemReward, Reward } from "@/services/api";
 import { User } from "@/services/api";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
@@ -20,14 +20,14 @@ type UseRewardsPageStateArgs = {
   setUser: (user: User | null) => void;
 };
 
-export const REWARDS_PAGE_SIZE = 10;
-const PER_PAGE = REWARDS_PAGE_SIZE;
+const PER_PAGE = 6;
 const SEARCH_DEBOUNCE_MS = 500;
 
 export function useRewardsPageState({ user, authLoading, setUser }: UseRewardsPageStateArgs) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [query, setQuery] = useState("");
+  const [page, setPage] = useState(1);
   const [selectedRewardTypes, setSelectedRewardTypes] = useState<Reward["reward_type"][]>([]);
   const [affordableOnly, setAffordableOnly] = useState(false);
   const [redeemError, setRedeemError] = useState("");
@@ -38,37 +38,32 @@ export function useRewardsPageState({ user, authLoading, setUser }: UseRewardsPa
   const [pendingReward, setPendingReward] = useState<Reward | null>(null);
   const [redemptionSuccess, setRedemptionSuccess] = useState<RedemptionSuccessState | null>(null);
   const fallbackTimerRef = useRef<number | null>(null);
-  const bottomSentinelRef = useRef<HTMLDivElement | null>(null);
 
-  const maxPoints = user?.points_balance ?? 0;
-
-  const rewardsInfiniteQuery = useInfiniteQuery({
+  const rewardsQuery = useQuery({
     queryKey: [
       "rewards",
       {
         query: debouncedQuery,
+        page,
         perPage: PER_PAGE,
         rewardTypes: selectedRewardTypes,
         affordableOnly,
-        maxPoints,
+        maxPoints: user?.points_balance ?? 0,
       },
     ],
-    queryFn: ({ pageParam }: { pageParam: string | undefined }) =>
-      fetchRewards({
+    queryFn: () => {
+      return fetchRewards({
         query: debouncedQuery,
-        cursor: pageParam,
+        page,
         perPage: PER_PAGE,
         rewardTypes: selectedRewardTypes,
         affordableOnly,
-        maxPoints,
-      }),
-    initialPageParam: undefined as string | undefined,
-    getNextPageParam: (lastPage) =>
-      lastPage.meta.has_next && lastPage.meta.next_cursor ? lastPage.meta.next_cursor : undefined,
+        maxPoints: user?.points_balance ?? 0,
+      });
+    },
     enabled: !authLoading && Boolean(user),
     staleTime: 30_000,
   });
-
   const redeemMutation = useMutation({
     mutationFn: (rewardId: number) => redeemReward(rewardId),
   });
@@ -79,55 +74,27 @@ export function useRewardsPageState({ user, authLoading, setUser }: UseRewardsPa
     }
   }, [user, authLoading, router]);
 
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedQuery]);
+
   const rewards = useMemo(
-    () =>
-      rewardsInfiniteQuery.data?.pages.flatMap((page) =>
-        Array.isArray(page.data) ? page.data : []
-      ) ?? [],
-    [rewardsInfiniteQuery.data]
+    () => (Array.isArray(rewardsQuery.data?.data) ? rewardsQuery.data.data : []),
+    [rewardsQuery.data]
   );
-
-  const hasNextPage = rewardsInfiniteQuery.hasNextPage ?? false;
-  const isFetchingNextPage = rewardsInfiniteQuery.isFetchingNextPage;
-
-  const fetchNextPageRef = useRef(rewardsInfiniteQuery.fetchNextPage);
-  fetchNextPageRef.current = rewardsInfiniteQuery.fetchNextPage;
-  const hasNextPageRef = useRef(hasNextPage);
-  hasNextPageRef.current = hasNextPage;
-  const isFetchingNextPageRef = useRef(isFetchingNextPage);
-  isFetchingNextPageRef.current = isFetchingNextPage;
-
+  const totalPages = rewardsQuery.data?.meta?.total_pages ?? 1;
+  const totalCount = rewardsQuery.data?.meta?.total_count ?? rewards.length;
   const queryError =
-    rewardsInfiniteQuery.error instanceof Error
-      ? rewardsInfiniteQuery.error.message
-      : "Failed to load rewards";
-  const error = redeemError || (rewardsInfiniteQuery.isError ? queryError : "");
+    rewardsQuery.error instanceof Error ? rewardsQuery.error.message : "Failed to load rewards";
+  const error = redeemError || (rewardsQuery.isError ? queryError : "");
   const status = authLoading || !user
     ? "idle"
-    : rewardsInfiniteQuery.isError
+    : rewardsQuery.isError
       ? "error"
-      : rewardsInfiniteQuery.isSuccess
+      : rewardsQuery.isSuccess
         ? "success"
         : "loading";
-
-  const isInitialLoading = rewardsInfiniteQuery.isPending;
-
-  useLayoutEffect(() => {
-    const el = bottomSentinelRef.current;
-    if (!el || !user) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (!entries[0]?.isIntersecting) return;
-        if (!hasNextPageRef.current || isFetchingNextPageRef.current) return;
-        void fetchNextPageRef.current();
-      },
-      { root: null, rootMargin: "320px", threshold: 0 }
-    );
-
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [user, rewards.length]);
+  const isLoading = rewardsQuery.isPending || rewardsQuery.isFetching;
 
   async function handleRedeem(reward: Reward) {
     if (!user || redeemingId) return;
@@ -177,10 +144,20 @@ export function useRewardsPageState({ user, authLoading, setUser }: UseRewardsPa
     setSelectedRewardTypes((prev) =>
       prev.includes(type) ? prev.filter((value) => value !== type) : [...prev, type]
     );
+    setPage(1);
   }
 
   function onAffordableOnlyChange(nextValue: boolean) {
     setAffordableOnly(nextValue);
+    setPage(1);
+  }
+
+  function onPreviousPage() {
+    setPage((p) => Math.max(1, p - 1));
+  }
+
+  function onNextPage() {
+    setPage((p) => Math.min(totalPages, p + 1));
   }
 
   useEffect(() => {
@@ -232,6 +209,9 @@ export function useRewardsPageState({ user, authLoading, setUser }: UseRewardsPa
       }
     );
 
+    // Polling fallback is required because websocket delivery can fail in real
+    // networks (tab sleep, mobile switches, proxies); without this users can
+    // get stuck in "processing" even though the backend already finished.
     fallbackTimerRef.current = window.setInterval(async () => {
       try {
         const statusPayload = await getRedemptionStatus(processingRequestId);
@@ -253,14 +233,14 @@ export function useRewardsPageState({ user, authLoading, setUser }: UseRewardsPa
   return {
     rewards,
     status,
-    isLoading: isInitialLoading,
-    isFetchingNextPage,
+    isLoading,
     error,
     query,
     selectedRewardTypes,
     affordableOnly,
-    hasNextPage,
-    bottomSentinelRef,
+    page,
+    totalPages,
+    totalCount,
     redeemingId,
     processingRequestId,
     pendingReward,
@@ -272,5 +252,7 @@ export function useRewardsPageState({ user, authLoading, setUser }: UseRewardsPa
     onSearchChange,
     toggleRewardType,
     onAffordableOnlyChange,
+    onPreviousPage,
+    onNextPage,
   };
 }
