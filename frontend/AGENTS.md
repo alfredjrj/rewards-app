@@ -10,6 +10,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - Keep API calls in `services/` and UI logic in components/pages.
 - Favor small, focused components; extract repeated UI blocks.
 - Keep route files in `app/` thin and delegate complexity to components/hooks.
+- Keep page components presentational: page files should focus on layout/rendering and delegate data fetching, async state, pagination, and mutation flows to custom hooks.
 
 ## React Practices
 - Prefer function components with clear prop types.

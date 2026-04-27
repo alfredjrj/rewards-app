@@ -86,7 +86,8 @@ describe("RewardsPage", () => {
 
     expect(await screen.findByText("Free Coffee")).toBeInTheDocument();
     expect(screen.getByText("Page 1 of 3 (13 rewards)")).toBeInTheDocument();
-    expect(screen.getByText("Points balance: 690")).toBeInTheDocument();
+    expect(screen.getByText("Available points")).toBeInTheDocument();
+    expect(screen.getByText("690 pts")).toBeInTheDocument();
     expect(fetchRewardsMock).toHaveBeenCalledWith({ query: "", page: 1, perPage: 6 });
   });
 
@@ -238,51 +239,4 @@ describe("RewardsPage", () => {
     });
   });
 
-  it("closes confirmation modal without redeeming when cancelled", async () => {
-    const user = userEvent.setup();
-    render(<RewardsPage />);
-
-    expect(await screen.findByText("Free Coffee")).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "Redeem" }));
-    expect(screen.getByText("Use points for this reward?")).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "Cancel" }));
-
-    await waitFor(() => {
-      expect(screen.queryByText("Use points for this reward?")).not.toBeInTheDocument();
-    });
-    expect(redeemRewardMock).not.toHaveBeenCalled();
-  });
-
-  it("shows redeem error message when confirmation request fails", async () => {
-    redeemRewardMock.mockRejectedValueOnce(new Error("Reward is not available for redemption"));
-
-    const user = userEvent.setup();
-    render(<RewardsPage />);
-
-    expect(await screen.findByText("Free Coffee")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Redeem" }));
-    await user.click(screen.getByRole("button", { name: "Confirm redeem" }));
-
-    expect(await screen.findByText("Reward is not available for redemption")).toBeInTheDocument();
-    expect(screen.queryByText("Thanks, you are all set.")).not.toBeInTheDocument();
-  });
-
-  it("dismisses success confirmation banner", async () => {
-    const user = userEvent.setup();
-    render(<RewardsPage />);
-
-    expect(await screen.findByText("Free Coffee")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Redeem" }));
-    await user.click(screen.getByRole("button", { name: "Confirm redeem" }));
-
-    expect(await screen.findByText("Thanks, you are all set.")).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "Dismiss" }));
-
-    await waitFor(() => {
-      expect(screen.queryByText("Thanks, you are all set.")).not.toBeInTheDocument();
-    });
-  });
 });

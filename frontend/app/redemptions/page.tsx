@@ -1,52 +1,22 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
-import { getUserRedemptions, RedemptionHistoryItem } from "@/services/api";
 import { useAuth } from "@/lib/auth-context";
-
-const PER_PAGE = 10;
+import RedemptionsTableSkeleton from "@/components/redemptions/redemptions-table-skeleton";
+import { useRedemptionsPageState } from "@/hooks/use-redemptions-page-state";
 
 export default function RedemptionsPage() {
   const { user, loading: authLoading } = useAuth();
-  const router = useRouter();
-  const [rows, setRows] = useState<RedemptionHistoryItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalCount, setTotalCount] = useState(0);
-
-  useEffect(() => {
-    if (authLoading) return;
-    if (!user) {
-      router.replace("/login");
-      return;
-    }
-
-    let cancelled = false;
-    getUserRedemptions({ page, perPage: PER_PAGE })
-      .then((payload) => {
-        if (cancelled) return;
-        setRows(Array.isArray(payload.data) ? payload.data : []);
-        setTotalPages(payload.meta?.total_pages ?? 1);
-        setTotalCount(payload.meta?.total_count ?? 0);
-        setError("");
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        setError(err instanceof Error ? err.message : "Failed to load redemptions");
-      })
-      .finally(() => {
-        if (cancelled) return;
-        setLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [authLoading, user, router, page]);
+  const {
+    rows,
+    isLoading,
+    error,
+    page,
+    totalPages,
+    totalCount,
+    onPreviousPage,
+    onNextPage,
+  } = useRedemptionsPageState({ user, authLoading });
 
   if (authLoading) {
     return (
@@ -67,10 +37,10 @@ export default function RedemptionsPage() {
           <p className="text-purple-600 mt-2">Track your recent reward redemptions.</p>
         </div>
 
-        {loading && <div className="text-purple-500">Loading history...</div>}
+        {isLoading && <RedemptionsTableSkeleton />}
         {error && <div className="text-red-600 bg-red-50 border border-red-200 rounded-xl p-4">{error}</div>}
 
-        {!loading && !error && (
+        {!isLoading && !error && (
           <section className="bg-white rounded-2xl border border-purple-100 shadow-sm overflow-hidden">
             <div className="grid grid-cols-12 gap-3 px-5 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500 border-b border-gray-100">
               <div className="col-span-5">Reward</div>
@@ -98,7 +68,7 @@ export default function RedemptionsPage() {
           </section>
         )}
 
-        {!loading && !error && totalCount > 0 && (
+        {!isLoading && !error && totalCount > 0 && (
           <div className="mt-6 flex items-center justify-between bg-white rounded-2xl border border-purple-100 p-4">
             <p className="text-sm text-gray-600">
               Page {page} of {totalPages} ({totalCount} redemptions)
@@ -106,7 +76,7 @@ export default function RedemptionsPage() {
             <div className="flex gap-2">
               <button
                 type="button"
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                onClick={onPreviousPage}
                 disabled={page <= 1}
                 className="px-4 py-2 rounded-lg border border-gray-200 text-sm disabled:opacity-50"
               >
@@ -114,7 +84,7 @@ export default function RedemptionsPage() {
               </button>
               <button
                 type="button"
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                onClick={onNextPage}
                 disabled={page >= totalPages}
                 className="px-4 py-2 rounded-lg border border-gray-200 text-sm disabled:opacity-50"
               >
