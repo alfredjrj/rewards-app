@@ -4,10 +4,18 @@ class Api::V1::User::RedemptionSerializer
       data: {
         id: redemption.id,
         reward_id: redemption.reward_id,
+        reward_title: redemption.reward&.title,
         points_cost_snapshot: redemption.points_cost_snapshot,
-        status: redemption.status
+        status: redemption.status,
+        created_at: redemption.created_at
       }
     }
+  end
+
+  class Collection
+    def self.call(redemptions:)
+      { data: redemptions.map { |redemption| Api::V1::User::RedemptionSerializer.call(redemption: redemption)[:data] } }
+    end
   end
 
   class Status

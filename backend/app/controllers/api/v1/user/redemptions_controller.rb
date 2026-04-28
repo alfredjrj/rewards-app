@@ -18,7 +18,7 @@ class Api::V1::User::RedemptionsController < AuthenticationController
     )
     pagy_obj, paginated_redemptions = Pagy::OffsetPaginator.paginate(scope, request: pagy_request)
 
-    render json: ::Api::V1::User::RedemptionHistorySerializer::Collection
+    render json: ::Api::V1::User::RedemptionSerializer::Collection
       .call(redemptions: paginated_redemptions)
       .merge(meta: ::Api::V1::PaginationMetaSerializer.call(pagy: pagy_obj))
   end

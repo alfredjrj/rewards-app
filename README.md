@@ -138,6 +138,18 @@ Why it is out of scope:
 
 In a production-hardening phase, adding a read-only drift detector (and later controlled repair tooling) would be a recommended next step.
 
+### API Rate Limiting
+
+Request-level rate limiting (for example per-IP or per-user throttles on auth, points, and redemption endpoints) is intentionally **out of scope** for this iteration.
+
+Why it is out of scope:
+
+- This take-home/interview scope prioritizes core correctness and UX (idempotent redemptions, async status updates, pending-balance visibility) over edge-layer traffic controls.
+- Robust rate limiting is environment-specific and typically relies on deployment details (reverse proxy/CDN/WAF, shared Redis topology, trusted client IP handling).
+- Shipping a naive in-app limiter without that infrastructure can create false positives or uneven throttling behavior.
+
+In a production-hardening phase, rate limits should be added at both the edge and app layers with endpoint-specific budgets and observability.
+
 ---
 
 ## Non-Functional Requirements
