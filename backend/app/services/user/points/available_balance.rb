@@ -8,8 +8,10 @@ class User::Points::AvailableBalance
   end
 
   def call
-    points_balance = latest_points_balance
-    points_pending_redemption = pending_redemption_points
+    snapshot = ActiveRecord::Base.connection.select_one(balance_snapshot_sql)
+    points_balance = snapshot.fetch("points_balance").to_i
+    points_pending_redemption = snapshot.fetch("points_pending_redemption").to_i
+
     {
       points_balance: points_balance,
       points_pending_redemption: points_pending_redemption,
@@ -21,17 +23,29 @@ class User::Points::AvailableBalance
 
   attr_reader :user
 
-  def latest_points_balance
-    user
-      .point_transactions
-      .order(created_at: :desc, id: :desc)
-      .pick(:running_balance) || 0
-  end
-
-  def pending_redemption_points
-    user
-      .redemptions
-      .where(status: "processing")
-      .sum(:points_cost_snapshot)
+  def balance_snapshot_sql
+    ActiveRecord::Base.send(
+      :sanitize_sql_array,
+      [
+        <<~SQL.squish,
+          SELECT
+            COALESCE(
+              (SELECT running_balance
+               FROM user_point_transactions
+               WHERE user_id = ?
+               ORDER BY id DESC
+               LIMIT 1), 0
+            ) AS points_balance,
+            COALESCE(
+              (SELECT SUM(points_cost_snapshot)
+               FROM user_redemptions
+               WHERE user_id = ?
+                 AND status = 'processing'), 0
+            ) AS points_pending_redemption
+        SQL
+        user.id,
+        user.id
+      ]
+    )
   end
 end

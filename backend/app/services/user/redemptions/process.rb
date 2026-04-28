@@ -3,6 +3,7 @@ module User::Redemptions
   # Raises TransientFailure when Sidekiq should retry (infra or internal_error from Create).
   class Process
     TransientFailure = Class.new(StandardError)
+    TERMINAL_STATUSES = %w[completed failed cancelled].freeze
 
     INFRA_TRANSIENT_EXCEPTIONS = [
       ActiveRecord::ConnectionNotEstablished,
@@ -20,7 +21,8 @@ module User::Redemptions
     def self.finalize_after_retries_exhausted(sidekiq_msg, exception)
       user_id, reward_id, request_id = Array(sidekiq_msg["args"])
       return if user_id.blank? || request_id.blank?
-      mark_redemption_status(user_id: user_id, request_id: request_id, status: "failed")
+      updated = mark_redemption_status(user_id: user_id, request_id: request_id, status: "failed")
+      return unless updated
 
       payload = {
         request_id: request_id,
@@ -94,10 +96,12 @@ module User::Redemptions
 
     def self.mark_redemption_status(user_id:, request_id:, status:)
       redemption = User::Redemption.find_by(user_id: user_id, idempotency_key: request_id)
-      return unless redemption
-      return if redemption.status == status
+      return false unless redemption
+      return false if TERMINAL_STATUSES.include?(redemption.status)
+      return false if redemption.status == status
 
       redemption.update!(status: status)
+      true
     end
 
     private

@@ -106,21 +106,30 @@ RSpec.describe User::Redemptions::Process do
 
   describe ".finalize_after_retries_exhausted" do
     it "broadcasts terminal internal_error payload" do
+      user = create(:user)
+      reward = create(:reward)
+      create(
+        :user_redemption,
+        user: user,
+        reward: reward,
+        status: "processing",
+        idempotency_key: "req-123"
+      )
       allow(ActionCable.server).to receive(:broadcast)
 
       described_class.finalize_after_retries_exhausted(
         {
           "jid" => "abc123",
-          "args" => [ 12, 34, "req-123" ]
+          "args" => [ user.id, reward.id, "req-123" ]
         },
         StandardError.new("boom")
       )
 
       expect(ActionCable.server).to have_received(:broadcast).with(
-        "user_redemptions:12",
+        "user_redemptions:#{user.id}",
         hash_including(
           request_id: "req-123",
-          reward_id: 34,
+          reward_id: reward.id,
           status: "failed",
           error: hash_including(code: "internal_error")
         )
@@ -134,6 +143,52 @@ RSpec.describe User::Redemptions::Process do
       described_class.finalize_after_retries_exhausted({ "args" => [ 1, 1, "" ] }, StandardError.new)
 
       expect(ActionCable.server).not_to have_received(:broadcast)
+    end
+
+    it "does not broadcast failed when redemption is already completed" do
+      user = create(:user)
+      reward = create(:reward)
+      create(
+        :user_redemption,
+        user: user,
+        reward: reward,
+        status: "completed",
+        idempotency_key: "req-123"
+      )
+      allow(ActionCable.server).to receive(:broadcast)
+
+      described_class.finalize_after_retries_exhausted(
+        {
+          "jid" => "abc123",
+          "args" => [ user.id, reward.id, "req-123" ]
+        },
+        StandardError.new("boom")
+      )
+
+      expect(ActionCable.server).not_to have_received(:broadcast)
+    end
+  end
+
+  describe ".mark_redemption_status" do
+    it "does not demote completed to failed" do
+      user = create(:user)
+      reward = create(:reward)
+      redemption = create(
+        :user_redemption,
+        user: user,
+        reward: reward,
+        status: "completed",
+        idempotency_key: "req-123"
+      )
+
+      updated = described_class.mark_redemption_status(
+        user_id: user.id,
+        request_id: "req-123",
+        status: "failed"
+      )
+
+      expect(updated).to be(false)
+      expect(redemption.reload.status).to eq("completed")
     end
   end
 end
