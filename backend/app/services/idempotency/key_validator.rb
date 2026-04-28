@@ -1,7 +1,6 @@
-module User::Redemptions
-  class IdempotencyKey
+module Idempotency
+  class KeyValidator
     KEY_RE = /\A[A-Za-z0-9_-]{1,128}\z/
-
     Result = Struct.new(:valid?, :key, :error, keyword_init: true)
 
     def self.call(raw_header_value:)

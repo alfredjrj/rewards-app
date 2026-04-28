@@ -1,6 +1,6 @@
 require "rails_helper"
 
-RSpec.describe User::Redemptions::ReserveProcessing do
+RSpec.describe User::Redemptions::PlaceCreditHoldAndEnqueue do
   describe ".call" do
     let(:user) { create(:user) }
     let(:reward) { create(:reward, points_cost: 100, is_available: true) }

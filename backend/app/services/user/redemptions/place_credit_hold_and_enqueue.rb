@@ -1,6 +1,6 @@
 module User::Redemptions
   # Reserves a processing redemption row (idempotently) and enqueues async completion.
-  class ReserveProcessing
+  class PlaceCreditHoldAndEnqueue
     Result = Struct.new(:success?, :error, :redemption, keyword_init: true)
 
     def self.call(...)

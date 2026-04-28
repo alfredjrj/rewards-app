@@ -1,6 +1,6 @@
 require "rails_helper"
 
-RSpec.describe User::Redemptions::FinalizeProcessing do
+RSpec.describe User::Redemptions::Process do
   describe ".call" do
     it "runs Create and broadcasts completed status" do
       user = create(:user)
@@ -118,11 +118,9 @@ RSpec.describe User::Redemptions::FinalizeProcessing do
       allow(ActionCable.server).to receive(:broadcast)
 
       described_class.finalize_after_retries_exhausted(
-        {
-          "jid" => "abc123",
-          "args" => [ user.id, reward.id, "req-123" ]
-        },
-        StandardError.new("boom")
+        user_id: user.id,
+        reward_id: reward.id,
+        request_id: "req-123"
       )
 
       expect(ActionCable.server).to have_received(:broadcast).with(
@@ -139,8 +137,8 @@ RSpec.describe User::Redemptions::FinalizeProcessing do
     it "does nothing when user_id or request_id is blank" do
       allow(ActionCable.server).to receive(:broadcast)
 
-      described_class.finalize_after_retries_exhausted({ "args" => [ nil, 1, "r" ] }, StandardError.new)
-      described_class.finalize_after_retries_exhausted({ "args" => [ 1, 1, "" ] }, StandardError.new)
+      described_class.finalize_after_retries_exhausted(user_id: nil, reward_id: 1, request_id: "r")
+      described_class.finalize_after_retries_exhausted(user_id: 1, reward_id: 1, request_id: "")
 
       expect(ActionCable.server).not_to have_received(:broadcast)
     end
@@ -158,18 +156,17 @@ RSpec.describe User::Redemptions::FinalizeProcessing do
       allow(ActionCable.server).to receive(:broadcast)
 
       described_class.finalize_after_retries_exhausted(
-        {
-          "jid" => "abc123",
-          "args" => [ user.id, reward.id, "req-123" ]
-        },
-        StandardError.new("boom")
+        user_id: user.id,
+        reward_id: reward.id,
+        request_id: "req-123"
       )
 
       expect(ActionCable.server).not_to have_received(:broadcast)
     end
   end
 
-  describe ".mark_redemption_status" do
+  describe User::Redemptions::StatusTransition do
+    describe ".mark" do
     it "does not demote completed to failed" do
       user = create(:user)
       reward = create(:reward)
@@ -181,7 +178,7 @@ RSpec.describe User::Redemptions::FinalizeProcessing do
         idempotency_key: "req-123"
       )
 
-      updated = described_class.mark_redemption_status(
+      updated = described_class.mark(
         user_id: user.id,
         request_id: "req-123",
         status: "failed"
@@ -189,6 +186,7 @@ RSpec.describe User::Redemptions::FinalizeProcessing do
 
       expect(updated).to be(false)
       expect(redemption.reload.status).to eq("completed")
+    end
     end
   end
 end

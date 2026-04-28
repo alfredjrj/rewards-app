@@ -29,7 +29,7 @@ class Api::V1::User::RedemptionsController < AuthenticationController
     user_redemption = current_user.redemptions.build(reward: @reward)
     authorize user_redemption
 
-    enqueue_result = User::Redemptions::ReserveProcessing.call(
+    enqueue_result = User::Redemptions::PlaceCreditHoldAndEnqueue.call(
       user: current_user,
       reward: @reward,
       idempotency_key: @idempotency_key
@@ -102,7 +102,7 @@ class Api::V1::User::RedemptionsController < AuthenticationController
   end
 
   def set_create_idempotency_key
-    result = User::Redemptions::IdempotencyKey.call(
+    result = Idempotency::KeyValidator.call(
       raw_header_value: request.headers["Idempotency-Key"]
     )
     if result.valid?

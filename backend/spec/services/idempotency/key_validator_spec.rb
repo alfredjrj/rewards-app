@@ -1,6 +1,6 @@
 require "rails_helper"
 
-RSpec.describe User::Redemptions::IdempotencyKey do
+RSpec.describe Idempotency::KeyValidator do
   describe ".call" do
     it "returns valid key when header value is valid" do
       result = described_class.call(raw_header_value: "abc-123_DEF")
