@@ -1,7 +1,7 @@
 class Api::V1::User::RedemptionsController < AuthenticationController
   DEFAULT_PER_PAGE = 10
   MAX_PER_PAGE = 50
-  before_action :set_create_idempotency_key, :set_existing_redemption, only: :create
+  before_action :set_create_idempotency_key, :load_and_render_existing_redemption, only: :create
 
   def index
     authorize User::Redemption, :index?
@@ -25,16 +25,6 @@ class Api::V1::User::RedemptionsController < AuthenticationController
   end
 
   def create
-    if existing_redemption?
-      authorize @existing_redemption
-      render json: ::Api::V1::User::RedemptionSerializer::Status.call(
-        request_id: @idempotency_key,
-        status: @existing_redemption.status,
-        redemption: @existing_redemption
-      ), status: :accepted
-      return
-    end
-
     @reward = ::Reward.find(redemption_params[:reward_id])
     user_redemption = current_user.redemptions.build(reward: @reward)
     authorize user_redemption
@@ -119,12 +109,15 @@ class Api::V1::User::RedemptionsController < AuthenticationController
     }, status: :bad_request
   end
 
-  def set_existing_redemption
+  def load_and_render_existing_redemption
     @existing_redemption = existing_redemption_for(@idempotency_key)
-  end
+    return unless @existing_redemption
 
-  def existing_redemption?
-    @existing_redemption.present?
+    authorize @existing_redemption
+    render json: ::Api::V1::User::RedemptionSerializer::Status.call(
+      request_id: @idempotency_key,
+      status: @existing_redemption.status,
+      redemption: @existing_redemption
+    ), status: :accepted
   end
-
 end

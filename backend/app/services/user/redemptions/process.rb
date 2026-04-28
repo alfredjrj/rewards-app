@@ -8,7 +8,7 @@ module User::Redemptions
       ActiveRecord::ConnectionNotEstablished,
       ActiveRecord::Deadlocked,
       ActiveRecord::LockWaitTimeout,
-      ActiveRecord::SerializationFailure,
+      ActiveRecord::SerializationFailure
     ].freeze
 
     RETRYABLE_SERVICE_ERROR_CODES = %w[internal_error].freeze
