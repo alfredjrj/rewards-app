@@ -72,7 +72,7 @@ export interface RedemptionHistoryItem {
 export interface GetUserRedemptionsOptions {
   page?: number;
   perPage?: number;
-  status?: "completed" | "failed" | "cancelled";
+  status?: "processing" | "completed" | "failed" | "cancelled";
   minPoints?: number;
   maxPoints?: number;
   sort?: "created_at" | "-created_at" | "points_cost_snapshot" | "-points_cost_snapshot";

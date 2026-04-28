@@ -17,8 +17,6 @@ RSpec.describe "Api::V1::User::PointsController", type: :request do
       before { sign_in user }
 
       it "returns zero when no point transactions exist" do
-        allow(User::Redemptions::PendingPoints).to receive(:pending_total_for).with(user_id: user.id).and_return(0)
-
         get "/api/v1/user/points"
 
         expect(response).to have_http_status(:ok)
@@ -50,8 +48,15 @@ RSpec.describe "Api::V1::User::PointsController", type: :request do
           reason_code: "reward_redemption",
           idempotency_key: "3f587c43-d4ff-4453-8835-d59a6159382b"
         )
-
-        allow(User::Redemptions::PendingPoints).to receive(:pending_total_for).with(user_id: user.id).and_return(75)
+        reward = create(:reward, points_cost: 75)
+        create(
+          :user_redemption,
+          user: user,
+          reward: reward,
+          points_cost_snapshot: 75,
+          status: "processing",
+          idempotency_key: "pending-req-1"
+        )
 
         get "/api/v1/user/points"
 

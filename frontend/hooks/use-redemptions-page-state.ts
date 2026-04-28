@@ -7,7 +7,7 @@ import { getUserRedemptions, User } from "@/services/api";
 
 const PER_PAGE = 10;
 const SORT_OPTIONS = ["-created_at", "created_at", "-points_cost_snapshot", "points_cost_snapshot"] as const;
-const STATUS_OPTIONS = ["completed", "failed", "cancelled"] as const;
+const STATUS_OPTIONS = ["processing", "completed", "failed", "cancelled"] as const;
 type SortOption = typeof SORT_OPTIONS[number];
 type StatusOption = typeof STATUS_OPTIONS[number];
 

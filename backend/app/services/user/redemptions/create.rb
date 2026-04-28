@@ -14,7 +14,7 @@ module User::Redemptions
 
     def call
       existing = user.redemptions.find_by(idempotency_key: idempotency_key)
-      return success(existing, current_points_balance) if existing
+      return success(existing, current_points_balance) if existing&.status == "completed"
       return failure("reward_unavailable", "Reward is not available for redemption") unless reward.is_available?
 
       ActiveRecord::Base.transaction do
@@ -30,12 +30,11 @@ module User::Redemptions
 
         return failure_from_points_result(points_result) unless points_result.success?
 
-        redemption = User::Redemption.create!(
-          user: user,
+        redemption = existing || User::Redemption.new(user: user, idempotency_key: idempotency_key)
+        redemption.update!(
           reward: reward,
           points_cost_snapshot: reward.points_cost,
-          status: "completed",
-          idempotency_key: idempotency_key
+          status: "completed"
         )
 
         success(redemption, points_result.transaction.running_balance)

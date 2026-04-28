@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_04_27_210000) do
+ActiveRecord::Schema[8.0].define(version: 2026_04_28_031500) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -64,7 +64,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_04_27_210000) do
     t.index ["user_id", "idempotency_key"], name: "index_user_redemptions_on_user_id_and_idempotency_key", unique: true
     t.index ["user_id"], name: "index_user_redemptions_on_user_id"
     t.check_constraint "points_cost_snapshot >= 0", name: "chk_redemptions_points_cost_snapshot_non_negative"
-    t.check_constraint "status::text = ANY (ARRAY['completed'::character varying::text, 'failed'::character varying::text, 'cancelled'::character varying::text])", name: "chk_redemptions_status_valid"
+    t.check_constraint "status::text = ANY (ARRAY['processing'::character varying, 'completed'::character varying, 'failed'::character varying, 'cancelled'::character varying]::text[])", name: "chk_redemptions_status_valid"
   end
 
   create_table "users", force: :cascade do |t|

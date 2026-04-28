@@ -58,7 +58,7 @@ RSpec.describe User::Redemptions::Create do
     end
 
     it "rolls back points deduction when redemption creation fails" do
-      allow(User::Redemption).to receive(:create!).and_raise(
+      allow_any_instance_of(User::Redemption).to receive(:update!).and_raise(
         ActiveRecord::RecordInvalid.new(User::Redemption.new)
       )
 
@@ -69,6 +69,24 @@ RSpec.describe User::Redemptions::Create do
       expect(user.redemptions.count).to eq(0)
       expect(user.point_transactions.count).to eq(1)
       expect(user.point_transactions.order(:id).last.running_balance).to eq(500)
+    end
+
+    it "completes an existing processing redemption row" do
+      processing = create(
+        :user_redemption,
+        user: user,
+        reward: reward,
+        points_cost_snapshot: reward.points_cost,
+        status: "processing",
+        idempotency_key: idempotency_key
+      )
+
+      result = described_class.call(user: user, reward: reward, idempotency_key: idempotency_key)
+
+      expect(result.success?).to be(true)
+      expect(result.redemption.id).to eq(processing.id)
+      expect(result.redemption.status).to eq("completed")
+      expect(user.point_transactions.order(:id).last.amount).to eq(-120)
     end
 
     it "re-raises unexpected exceptions so retries/error monitoring can capture them" do

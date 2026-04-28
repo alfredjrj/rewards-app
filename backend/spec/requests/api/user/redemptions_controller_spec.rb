@@ -129,17 +129,10 @@ RSpec.describe "Api::V1::User::RedemptionsController", type: :request do
       it "enqueues async redemption processing and returns processing state" do
         key = "406625f1-81c1-43e4-9e74-377e4c6ff31c"
         allow(User::Redemptions::ProcessJob).to receive(:perform_in)
-        allow(User::Redemptions::PendingPoints).to receive(:reserve!).and_return(true)
 
         post "/api/v1/user/redemptions",
              params: { redemption: { reward_id: reward.id } },
              headers: { "Idempotency-Key" => key }
-
-        expect(User::Redemptions::PendingPoints).to have_received(:reserve!).with(
-          user_id: user.id,
-          request_id: key,
-          points: reward.points_cost
-        )
 
         expect(User::Redemptions::ProcessJob).to have_received(:perform_in).with(
           2.seconds,
@@ -154,6 +147,25 @@ RSpec.describe "Api::V1::User::RedemptionsController", type: :request do
           "request_id" => key,
           "reward_id" => reward.id,
           "status" => "processing"
+        )
+        redemption = user.redemptions.find_by(idempotency_key: key)
+        expect(redemption).to be_present
+        expect(redemption.status).to eq("processing")
+      end
+
+      it "returns existing status for duplicate idempotency key without enqueueing" do
+        key = "406625f1-81c1-43e4-9e74-377e4c6ff31c"
+        create(:user_redemption, user: user, reward: reward, idempotency_key: key, status: "completed")
+        allow(User::Redemptions::ProcessJob).to receive(:perform_in)
+
+        post "/api/v1/user/redemptions",
+             params: { redemption: { reward_id: reward.id } },
+             headers: { "Idempotency-Key" => key }
+
+        expect(User::Redemptions::ProcessJob).not_to have_received(:perform_in)
+        expect(response).to have_http_status(:accepted)
+        expect(JSON.parse(response.body)).to include(
+          "data" => hash_including("request_id" => key, "status" => "completed")
         )
       end
     end
@@ -199,6 +211,27 @@ RSpec.describe "Api::V1::User::RedemptionsController", type: :request do
             "points_cost_snapshot" => reward.points_cost,
             "status" => "completed"
           }
+        )
+      end
+
+      it "returns failed when redemption exists but is failed" do
+        reward = create(:reward)
+        create(
+          :user_redemption,
+          user: user,
+          reward: reward,
+          status: "failed",
+          idempotency_key: "failed-123"
+        )
+
+        get "/api/v1/user/redemptions/failed-123"
+
+        expect(response).to have_http_status(:ok)
+        expect(JSON.parse(response.body)).to include(
+          "data" => hash_including(
+            "request_id" => "failed-123",
+            "status" => "failed"
+          )
         )
       end
     end

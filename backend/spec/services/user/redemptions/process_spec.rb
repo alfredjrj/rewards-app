@@ -13,14 +13,8 @@ RSpec.describe User::Redemptions::Process do
       )
       allow(User::Redemptions::Create).to receive(:call).and_return(result)
       allow(ActionCable.server).to receive(:broadcast)
-      allow(User::Redemptions::PendingPoints).to receive(:release!)
 
       described_class.call(user_id: user.id, reward_id: reward.id, request_id: key)
-
-      expect(User::Redemptions::PendingPoints).to have_received(:release!).with(
-        user_id: user.id,
-        request_id: key
-      )
 
       expect(User::Redemptions::Create).to have_received(:call).with(
         user: user,
@@ -57,17 +51,11 @@ RSpec.describe User::Redemptions::Process do
         ActiveRecord::RecordNotFound.new("Couldn't find User")
       )
       allow(ActionCable.server).to receive(:broadcast)
-      allow(User::Redemptions::PendingPoints).to receive(:release!)
       expect(User::Redemptions::Create).not_to receive(:call)
 
       expect do
         described_class.call(user_id: user.id, reward_id: reward.id, request_id: key)
       end.not_to raise_error
-
-      expect(User::Redemptions::PendingPoints).to have_received(:release!).with(
-        user_id: user.id,
-        request_id: key
-      )
 
       expect(ActionCable.server).to have_received(:broadcast).with(
         "user_redemptions:#{user.id}",
@@ -106,14 +94,8 @@ RSpec.describe User::Redemptions::Process do
       result = instance_double("ServiceResponse", success?: false, error: error)
       allow(User::Redemptions::Create).to receive(:call).and_return(result)
       allow(ActionCable.server).to receive(:broadcast)
-      allow(User::Redemptions::PendingPoints).to receive(:release!)
 
       described_class.call(user_id: user.id, reward_id: reward.id, request_id: key)
-
-      expect(User::Redemptions::PendingPoints).to have_received(:release!).with(
-        user_id: user.id,
-        request_id: key
-      )
 
       expect(ActionCable.server).to have_received(:broadcast).with(
         "user_redemptions:#{user.id}",
@@ -125,7 +107,6 @@ RSpec.describe User::Redemptions::Process do
   describe ".finalize_after_retries_exhausted" do
     it "broadcasts terminal internal_error payload" do
       allow(ActionCable.server).to receive(:broadcast)
-      allow(User::Redemptions::PendingPoints).to receive(:release!)
 
       described_class.finalize_after_retries_exhausted(
         {
@@ -133,11 +114,6 @@ RSpec.describe User::Redemptions::Process do
           "args" => [ 12, 34, "req-123" ]
         },
         StandardError.new("boom")
-      )
-
-      expect(User::Redemptions::PendingPoints).to have_received(:release!).with(
-        user_id: 12,
-        request_id: "req-123"
       )
 
       expect(ActionCable.server).to have_received(:broadcast).with(

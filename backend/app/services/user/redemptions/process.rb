@@ -1,8 +1,6 @@
 module User::Redemptions
   # Runs async redemption after enqueue: Create + publish status for polling/cable.
   # Raises TransientFailure when Sidekiq should retry (infra or internal_error from Create).
-  # Releases PendingPoints on terminal outcomes only (success, non-retryable failure, not_found,
-  # retries exhausted)—not while Sidekiq is still retrying, so Redis holds stay aligned with jobs.
   class Process
     TransientFailure = Class.new(StandardError)
 
@@ -22,8 +20,7 @@ module User::Redemptions
     def self.finalize_after_retries_exhausted(sidekiq_msg, exception)
       user_id, reward_id, request_id = Array(sidekiq_msg["args"])
       return if user_id.blank? || request_id.blank?
-
-      PendingPoints.release!(user_id: user_id, request_id: request_id)
+      mark_redemption_status(user_id: user_id, request_id: request_id, status: "failed")
 
       payload = {
         request_id: request_id,
@@ -62,7 +59,6 @@ module User::Redemptions
         )
 
         if result.success?
-          PendingPoints.release!(user_id: user.id, request_id: @request_id)
           publish_status(user_id: user.id, reward_id: result.redemption.reward_id, status: "completed", error: nil)
           log :info, "completed", user_id: user.id, reward_id: reward.id
           return
@@ -70,11 +66,11 @@ module User::Redemptions
 
         raise TransientFailure, "Transient redemption processing failure" if retryable_service_error?(result.error)
 
-        PendingPoints.release!(user_id: user.id, request_id: @request_id)
+        self.class.mark_redemption_status(user_id: user.id, request_id: @request_id, status: "failed")
         publish_status(user_id: user.id, reward_id: reward.id, status: "failed", error: result.error)
         log :warn, "failed", user_id: user.id, reward_id: reward.id, error: result.error&.dig(:code)
       rescue ActiveRecord::RecordNotFound => e
-        PendingPoints.release!(user_id: @user_id, request_id: @request_id)
+        self.class.mark_redemption_status(user_id: @user_id, request_id: @request_id, status: "failed")
         publish_status(
           user_id: @user_id,
           reward_id: @reward_id,
@@ -94,6 +90,14 @@ module User::Redemptions
 
         raise
       end
+    end
+
+    def self.mark_redemption_status(user_id:, request_id:, status:)
+      redemption = User::Redemption.find_by(user_id: user_id, idempotency_key: request_id)
+      return unless redemption
+      return if redemption.status == status
+
+      redemption.update!(status: status)
     end
 
     private

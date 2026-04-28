@@ -182,6 +182,33 @@ describe("useRedemptionsPageState", () => {
     });
   });
 
+  it("supports pending status filter value", async () => {
+    const { result } = renderHook(() =>
+      useRedemptionsPageState({
+        user,
+        authLoading: false,
+      }),
+      { wrapper: createWrapper() }
+    );
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    act(() => {
+      result.current.onStatusFilterChange("processing");
+    });
+
+    await waitFor(() => {
+      expect(getUserRedemptionsMock).toHaveBeenLastCalledWith({
+        page: 1,
+        perPage: 10,
+        status: "processing",
+        sort: "-created_at",
+      });
+    });
+  });
+
   it("surfaces backend fetch errors", async () => {
     getUserRedemptionsMock.mockRejectedValue(new Error("Request failed"));
 

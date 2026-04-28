@@ -1,5 +1,5 @@
 class User::Redemption < ApplicationRecord
-  STATUSES = %w[completed failed cancelled].freeze
+  STATUSES = %w[processing completed failed cancelled].freeze
 
   belongs_to :user
   belongs_to :reward

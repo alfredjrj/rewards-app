@@ -6,6 +6,7 @@ import RedemptionsTableSkeleton from "@/components/redemptions/redemptions-table
 import { useRedemptionsPageState } from "@/hooks/use-redemptions-page-state";
 
 const STATUS_BADGE_STYLES: Record<string, string> = {
+  processing: "bg-amber-100 text-amber-800",
   completed: "bg-green-100 text-green-800",
   failed: "bg-rose-100 text-rose-800",
   cancelled: "bg-zinc-200 text-zinc-800",
@@ -50,6 +51,7 @@ export default function RedemptionsPage() {
 
   const statusOptions = [
     { label: "All", value: "" as const },
+    { label: "Pending", value: "processing" as const },
     { label: "Completed", value: "completed" as const },
     { label: "Failed", value: "failed" as const },
     { label: "Cancelled", value: "cancelled" as const },
@@ -154,7 +156,7 @@ export default function RedemptionsPage() {
                         STATUS_BADGE_STYLES[row.status] || "bg-slate-100 text-slate-800"
                       }`}
                     >
-                      {row.status}
+                      {row.status === "processing" ? "pending" : row.status}
                     </span>
                   </div>
                   <div className="col-span-3 text-gray-600">{new Date(row.created_at).toLocaleString()}</div>

@@ -25,22 +25,30 @@ class Api::V1::User::RedemptionsController < AuthenticationController
 
   def create
     authorize :redemption, :create?
-    reward = ::Reward.find(redemption_params[:reward_id])
-
     idempotency_key = request.headers["Idempotency-Key"].presence || SecureRandom.uuid
-    # Mirror Sidekiq intent in Redis so GET /points can subtract pending before the ledger debit
-    # runs (see User::Redemptions::PendingPoints).
-    did_reserve = User::Redemptions::PendingPoints.reserve!(
-      user_id: current_user.id,
-      request_id: idempotency_key,
-      points: reward.points_cost
+    existing = current_user.redemptions.find_by(idempotency_key: idempotency_key)
+    if existing
+      render json: ::Api::V1::User::RedemptionSerializer::Status.call(
+        request_id: idempotency_key,
+        status: existing.status,
+        redemption: existing
+      ), status: :accepted
+      return
+    end
+
+    reward = ::Reward.find(redemption_params[:reward_id])
+    current_user.redemptions.create!(
+      reward: reward,
+      points_cost_snapshot: reward.points_cost,
+      status: "processing",
+      idempotency_key: idempotency_key
     )
+
     begin
-      # Demo / interview only: enqueue processing 1s later so pending points (Redis) stay visible
-      # before the job runs—not how you’d ship production latency; use perform_async instead.
+      # Demo / interview only: enqueue processing later so "processing" state is visible in UI;
+      # not a production latency strategy (use perform_async there).
       User::Redemptions::ProcessJob.perform_in(2.second, current_user.id, reward.id, idempotency_key)
     rescue StandardError
-      User::Redemptions::PendingPoints.release!(user_id: current_user.id, request_id: idempotency_key) if did_reserve
       raise
     end
 
@@ -76,7 +84,7 @@ class Api::V1::User::RedemptionsController < AuthenticationController
     if redemption
       render json: ::Api::V1::User::RedemptionSerializer::Status.call(
         request_id: request_id,
-        status: "completed",
+        status: redemption.status,
         redemption: redemption
       )
       return

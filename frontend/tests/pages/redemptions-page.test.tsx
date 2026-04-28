@@ -56,7 +56,7 @@ describe("RedemptionsPage", () => {
           reward_id: 11,
           reward_title: "Free Coffee",
           points_cost_snapshot: 100,
-          status: "completed",
+          status: "processing",
           created_at: "2026-04-26T19:00:00Z",
         },
       ],
@@ -118,6 +118,14 @@ describe("RedemptionsPage", () => {
           created_at: "2026-04-26T19:00:00Z",
         },
         {
+          id: 4,
+          reward_id: 44,
+          reward_title: "Mystery Box",
+          points_cost_snapshot: 150,
+          status: "processing",
+          created_at: "2026-04-26T19:30:00Z",
+        },
+        {
           id: 2,
           reward_id: 22,
           reward_title: "VIP Pass",
@@ -134,15 +142,17 @@ describe("RedemptionsPage", () => {
           created_at: "2026-04-26T21:00:00Z",
         },
       ],
-      meta: { page: 1, per_page: 10, total_count: 3, total_pages: 1 },
+      meta: { page: 1, per_page: 10, total_count: 4, total_pages: 1 },
     });
 
     renderWithQueryClient(<RedemptionsPage />);
 
+    const pendingBadge = await screen.findByText("pending");
     const completedBadge = await screen.findByText("completed");
     const failedBadge = await screen.findByText("failed");
     const cancelledBadge = await screen.findByText("cancelled");
 
+    expect(pendingBadge.className).toContain("bg-amber-100");
     expect(completedBadge.className).toContain("bg-green-100");
     expect(failedBadge.className).toContain("bg-rose-100");
     expect(cancelledBadge.className).toContain("bg-zinc-200");
