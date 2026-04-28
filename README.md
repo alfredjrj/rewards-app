@@ -124,6 +124,8 @@ This account has **`admin: true`** (needed for **`/sidekiq`** — see Terminal 2
 
 ## Out of Scope (Current Iteration)
 
+Production configuration and deployment hardening are out of scope for this interview iteration.
+
 ### Ledger Reconciliation Service
 
 This project uses an append-only `User::PointTransaction` ledger with idempotency and user-level locking to keep balance updates consistent in normal application flow.
