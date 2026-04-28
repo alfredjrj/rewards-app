@@ -12,7 +12,7 @@ import RedemptionSuccessBanner from "@/components/rewards/redemption-success-ban
 import { useRewardsPageState } from "@/hooks/use-rewards-page-state";
 
 export default function RewardsPage() {
-  const { user, loading: authLoading, setUser } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const {
     rewards,
     isLoading,
@@ -23,6 +23,8 @@ export default function RewardsPage() {
     page,
     totalPages,
     totalCount,
+    pointsPendingRedemption,
+    pointsAvailable,
     redeemingId,
     processingRequestId,
     pendingReward,
@@ -36,7 +38,7 @@ export default function RewardsPage() {
     onAffordableOnlyChange,
     onPreviousPage,
     onNextPage,
-  } = useRewardsPageState({ user, authLoading, setUser });
+  } = useRewardsPageState({ user, authLoading });
 
   const showInitialWireframe = authLoading || (!user && isLoading);
 
@@ -61,7 +63,7 @@ export default function RewardsPage() {
 
   if (!user) return null;
 
-  const pendingPts = user.points_pending_redemption ?? 0;
+  const pendingPts = pointsPendingRedemption;
   const showPendingCard = pendingPts > 0 || Boolean(processingRequestId);
   const pendingAmountLoading = pendingPts === 0 && Boolean(processingRequestId);
 
@@ -89,7 +91,7 @@ export default function RewardsPage() {
               <div>
                 <p className="text-[11px] uppercase tracking-wide text-emerald-50">Available to spend</p>
                 <p className="text-2xl font-semibold leading-tight">
-                  {user.points_available ?? user.points_balance ?? 0} pts
+                  {pointsAvailable} pts
                 </p>
               </div>
             </section>
@@ -145,7 +147,7 @@ export default function RewardsPage() {
         {pendingReward && (
           <RedeemConfirmationModal
             reward={pendingReward}
-            currentPointsBalance={user.points_available ?? user.points_balance ?? 0}
+            currentPointsBalance={pointsAvailable}
             isSubmitting={redeemingId === pendingReward.id}
             onCancel={closeRedeemModal}
             onConfirm={confirmRedeem}
@@ -248,7 +250,7 @@ export default function RewardsPage() {
                     disabled={
                       !reward.is_available ||
                       redeemingId === reward.id ||
-                      (user.points_available ?? user.points_balance ?? 0) < reward.points_cost
+                      pointsAvailable < reward.points_cost
                     }
                     onClick={() => openRedeemModal(reward)}
                     className="px-3 py-1.5 rounded-lg border border-purple-200 text-xs font-medium text-purple-700 disabled:opacity-50"

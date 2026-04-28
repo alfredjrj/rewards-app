@@ -8,9 +8,7 @@ import RewardsPage from "@/app/rewards/page";
 const replaceMock = vi.fn();
 const fetchRewardsMock = vi.fn();
 const redeemRewardMock = vi.fn();
-const setUserMock = vi.fn((nextUser: { id: number; email: string; points_balance?: number }) => {
-  authState = { ...authState, user: nextUser };
-});
+const getUserPointsMock = vi.fn();
 const routerMock = { replace: replaceMock };
 function renderWithQueryClient(ui: ReactElement) {
   const queryClient = new QueryClient({
@@ -24,13 +22,11 @@ function renderWithQueryClient(ui: ReactElement) {
 }
 
 let authState: {
-  user: { id: number; email: string; points_balance?: number } | null;
+  user: { id: number; email: string } | null;
   loading: boolean;
-  setUser: (nextUser: { id: number; email: string; points_balance?: number }) => void;
 } = {
-  user: { id: 1, email: "demo@example.com", points_balance: 690 },
+  user: { id: 1, email: "demo@example.com" },
   loading: false,
-  setUser: setUserMock,
 };
 
 vi.mock("next/navigation", () => ({
@@ -44,6 +40,7 @@ vi.mock("@/lib/auth-context", () => ({
 vi.mock("@/services/api", () => ({
   fetchRewards: (...args: unknown[]) => fetchRewardsMock(...args),
   redeemReward: (...args: unknown[]) => redeemRewardMock(...args),
+  getUserPoints: (...args: unknown[]) => getUserPointsMock(...args),
 }));
 
 vi.mock("@/components/Navbar", () => ({
@@ -54,10 +51,14 @@ describe("RewardsPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     authState = {
-      user: { id: 1, email: "demo@example.com", points_balance: 690 },
+      user: { id: 1, email: "demo@example.com" },
       loading: false,
-      setUser: setUserMock,
     };
+    getUserPointsMock.mockResolvedValue({
+      points_balance: 690,
+      points_pending_redemption: 0,
+      points_available: 690,
+    });
     redeemRewardMock.mockResolvedValue({
       data: {
         id: 123,
@@ -83,7 +84,7 @@ describe("RewardsPage", () => {
   });
 
   it("redirects to login when user is not authenticated", async () => {
-    authState = { user: null, loading: false, setUser: setUserMock };
+    authState = { user: null, loading: false };
 
     renderWithQueryClient(<RewardsPage />);
 
@@ -97,7 +98,6 @@ describe("RewardsPage", () => {
     authState = {
       user: null,
       loading: true,
-      setUser: setUserMock,
     };
 
     renderWithQueryClient(<RewardsPage />);
@@ -316,11 +316,6 @@ describe("RewardsPage", () => {
     expect(screen.getByText(/You redeemed/)).toBeInTheDocument();
     expect(screen.queryByText(/new balance is/i)).not.toBeInTheDocument();
     expect(redeemRewardMock).toHaveBeenCalledWith(1, expect.any(String));
-    expect(setUserMock).toHaveBeenCalledWith({
-      id: 1,
-      email: "demo@example.com",
-      points_balance: 590,
-    });
   });
 
 });

@@ -37,7 +37,7 @@ vi.mock("@/lib/cable", () => ({
 }));
 
 describe("useRewardsPageState", () => {
-  const user = { id: 1, email: "demo@example.com", points_balance: 690 };
+  const user = { id: 1, email: "demo@example.com" };
   const reward = {
     id: 1,
     title: "Free Coffee",
@@ -46,7 +46,6 @@ describe("useRewardsPageState", () => {
     reward_type: "free_item" as const,
     is_available: true,
   };
-  const setUserMock = vi.fn();
   function createWrapper() {
     const queryClient = new QueryClient({
       defaultOptions: {
@@ -80,17 +79,11 @@ describe("useRewardsPageState", () => {
       reward_id: 1,
       status: "completed",
     });
-    getUserPointsMock
-      .mockResolvedValueOnce({
-        points_balance: 690,
-        points_pending_redemption: 100,
-        points_available: 590,
-      })
-      .mockResolvedValueOnce({
-        points_balance: 590,
-        points_pending_redemption: 0,
-        points_available: 590,
-      });
+    getUserPointsMock.mockResolvedValue({
+      points_balance: 690,
+      points_pending_redemption: 100,
+      points_available: 590,
+    });
   });
 
   afterEach(() => {
@@ -103,7 +96,6 @@ describe("useRewardsPageState", () => {
       useRewardsPageState({
         user: null,
         authLoading: false,
-        setUser: setUserMock,
       }),
       { wrapper: createWrapper() }
     );
@@ -119,7 +111,6 @@ describe("useRewardsPageState", () => {
       useRewardsPageState({
         user,
         authLoading: false,
-        setUser: setUserMock,
       }),
       { wrapper: createWrapper() }
     );
@@ -134,7 +125,7 @@ describe("useRewardsPageState", () => {
       perPage: 10,
       rewardTypes: [],
       affordableOnly: false,
-      maxPoints: 690,
+      maxPoints: 590,
     });
     expect(result.current.rewards).toEqual([reward]);
     expect(result.current.totalPages).toBe(1);
@@ -147,7 +138,6 @@ describe("useRewardsPageState", () => {
       useRewardsPageState({
         user,
         authLoading: false,
-        setUser: setUserMock,
       }),
       { wrapper: createWrapper() }
     );
@@ -159,7 +149,7 @@ describe("useRewardsPageState", () => {
         perPage: 10,
         rewardTypes: [],
         affordableOnly: false,
-        maxPoints: 690,
+        maxPoints: 590,
       });
     });
     act(() => {
@@ -175,7 +165,6 @@ describe("useRewardsPageState", () => {
       useRewardsPageState({
         user,
         authLoading: false,
-        setUser: setUserMock,
       }),
       { wrapper: createWrapper() }
     );
@@ -206,27 +195,13 @@ describe("useRewardsPageState", () => {
       expect(result.current.redemptionSuccess).toEqual({
         rewardTitle: "Free Coffee",
         pointsSpent: 100,
-        pointsBalance: 590,
+        pointsBalance: 690,
       });
     });
     expect(result.current.redemptionSuccess).toEqual({
       rewardTitle: "Free Coffee",
       pointsSpent: 100,
-      pointsBalance: 590,
-    });
-    expect(setUserMock).toHaveBeenNthCalledWith(1, {
-      id: 1,
-      email: "demo@example.com",
-      points_balance: 690,
-      points_pending_redemption: 100,
-      points_available: 590,
-    });
-    expect(setUserMock).toHaveBeenLastCalledWith({
-      id: 1,
-      email: "demo@example.com",
-      points_balance: 590,
-      points_pending_redemption: 0,
-      points_available: 590,
+      pointsBalance: 690,
     });
     expect(result.current.pendingReward).toBeNull();
   });
@@ -236,7 +211,6 @@ describe("useRewardsPageState", () => {
       useRewardsPageState({
         user,
         authLoading: false,
-        setUser: setUserMock,
       }),
       { wrapper: createWrapper() }
     );

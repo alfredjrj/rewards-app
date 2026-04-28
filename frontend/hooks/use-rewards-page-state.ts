@@ -17,7 +17,6 @@ type RedemptionSuccessState = {
 type UseRewardsPageStateArgs = {
   user: User | null;
   authLoading: boolean;
-  setUser: (user: User | null) => void;
 };
 
 const PER_PAGE = 10;
@@ -29,7 +28,7 @@ function createIdempotencyKey(): string {
   return `${Date.now()}-${Math.random()}`;
 }
 
-export function useRewardsPageState({ user, authLoading, setUser }: UseRewardsPageStateArgs) {
+export function useRewardsPageState({ user, authLoading }: UseRewardsPageStateArgs) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [query, setQuery] = useState("");
@@ -45,6 +44,21 @@ export function useRewardsPageState({ user, authLoading, setUser }: UseRewardsPa
   const [pendingIdempotencyKey, setPendingIdempotencyKey] = useState<string | null>(null);
   const [redemptionSuccess, setRedemptionSuccess] = useState<RedemptionSuccessState | null>(null);
   const fallbackTimerRef = useRef<number | null>(null);
+  const pointsQueryKey = [ "user", "points", user?.id ] as const;
+  const processingRewardRef = useRef<Reward | null>(null);
+  const pointsBalanceRef = useRef(0);
+  const pointsQueryKeyRef = useRef(pointsQueryKey);
+
+  const pointsQuery = useQuery({
+    queryKey: pointsQueryKey,
+    queryFn: getUserPoints,
+    enabled: !authLoading && Boolean(user),
+    staleTime: 10_000,
+  });
+  const points = pointsQuery.data;
+  const pointsBalance = points?.points_balance ?? 0;
+  const pointsPendingRedemption = points?.points_pending_redemption ?? 0;
+  const pointsAvailable = points?.points_available ?? pointsBalance;
 
   const rewardsQuery = useQuery({
     queryKey: [
@@ -55,18 +69,17 @@ export function useRewardsPageState({ user, authLoading, setUser }: UseRewardsPa
         perPage: PER_PAGE,
         rewardTypes: selectedRewardTypes,
         affordableOnly,
-        maxPoints: user?.points_available ?? user?.points_balance ?? 0,
+        maxPoints: pointsAvailable,
       },
     ],
     queryFn: () => {
-      const spendable = user?.points_available ?? user?.points_balance ?? 0;
       return fetchRewards({
         query: debouncedQuery,
         page,
         perPage: PER_PAGE,
         rewardTypes: selectedRewardTypes,
         affordableOnly,
-        maxPoints: spendable,
+        maxPoints: pointsAvailable,
       });
     },
     enabled: !authLoading && Boolean(user),
@@ -105,9 +118,20 @@ export function useRewardsPageState({ user, authLoading, setUser }: UseRewardsPa
         : "loading";
   const isLoading = rewardsQuery.isPending || rewardsQuery.isFetching;
 
+  useEffect(() => {
+    processingRewardRef.current = processingReward;
+  }, [processingReward]);
+
+  useEffect(() => {
+    pointsBalanceRef.current = pointsBalance;
+  }, [pointsBalance]);
+
+  useEffect(() => {
+    pointsQueryKeyRef.current = pointsQueryKey;
+  }, [pointsQueryKey]);
+
   async function handleRedeem(reward: Reward, idempotencyKey: string) {
     if (!user || redeemingId) return;
-    const currentUser = user;
 
     setRedeemingId(reward.id);
     setRedeemError("");
@@ -116,26 +140,14 @@ export function useRewardsPageState({ user, authLoading, setUser }: UseRewardsPa
       if (payload.data.status === "processing" && payload.data.request_id) {
         setProcessingRequestId(payload.data.request_id);
         setProcessingReward(reward);
-        try {
-          const latestPoints = await getUserPoints();
-          setUser({
-            ...currentUser,
-            points_balance: latestPoints.points_balance,
-            points_pending_redemption: latestPoints.points_pending_redemption,
-            points_available: latestPoints.points_available,
-          });
-        } catch {
-          // Header can refresh on next navigation; redemption flow still tracks completion.
-        }
+        await queryClient.invalidateQueries({ queryKey: pointsQueryKey });
       } else {
-        if (typeof payload.data.points_balance === "number") {
-          setUser({ ...currentUser, points_balance: payload.data.points_balance });
-        }
         setRedemptionSuccess({
           rewardTitle: reward.title,
           pointsSpent: reward.points_cost,
-          pointsBalance: payload.data.points_balance ?? currentUser.points_balance ?? 0,
+          pointsBalance: payload.data.points_balance ?? pointsBalance,
         });
+        await queryClient.invalidateQueries({ queryKey: pointsQueryKey });
       }
       await queryClient.invalidateQueries({ queryKey: ["rewards"] });
     } catch (err) {
@@ -188,8 +200,7 @@ export function useRewardsPageState({ user, authLoading, setUser }: UseRewardsPa
   }
 
   useEffect(() => {
-    if (!user || !processingRequestId) return;
-    const currentUser = user;
+    if (!processingRequestId) return;
 
     async function handleCompletion(payload: {
       request_id?: string;
@@ -198,24 +209,21 @@ export function useRewardsPageState({ user, authLoading, setUser }: UseRewardsPa
     }) {
       if (payload.request_id !== processingRequestId) return;
 
-      if (payload.status === "completed" && processingReward) {
-        let latestPointsBalance = currentUser.points_balance ?? 0;
+      if (payload.status === "completed" && processingRewardRef.current) {
+        let latestPointsBalance = pointsBalanceRef.current;
         try {
-          const latestPoints = await getUserPoints();
-          latestPointsBalance = latestPoints.points_balance;
-          setUser({
-            ...currentUser,
-            points_balance: latestPoints.points_balance,
-            points_pending_redemption: latestPoints.points_pending_redemption,
-            points_available: latestPoints.points_available,
+          const refreshedPoints = await queryClient.fetchQuery({
+            queryKey: pointsQueryKeyRef.current,
+            queryFn: getUserPoints,
           });
+          latestPointsBalance = refreshedPoints.points_balance;
         } catch {
           // Keep completion UX even if points refresh fails transiently.
         }
 
         setRedemptionSuccess({
-          rewardTitle: processingReward.title,
-          pointsSpent: processingReward.points_cost,
+          rewardTitle: processingRewardRef.current.title,
+          pointsSpent: processingRewardRef.current.points_cost,
           pointsBalance: latestPointsBalance,
         });
         void queryClient.invalidateQueries({ queryKey: ["rewards"] });
@@ -228,6 +236,7 @@ export function useRewardsPageState({ user, authLoading, setUser }: UseRewardsPa
         setRedeemError(payload.error?.message || "Failed to redeem reward");
         setProcessingRequestId(null);
         setProcessingReward(null);
+        void queryClient.invalidateQueries({ queryKey: pointsQueryKeyRef.current });
       }
     }
 
@@ -260,7 +269,7 @@ export function useRewardsPageState({ user, authLoading, setUser }: UseRewardsPa
         fallbackTimerRef.current = null;
       }
     };
-  }, [processingRequestId, processingReward, queryClient, user]);
+  }, [processingRequestId, queryClient]);
 
   return {
     rewards,
@@ -273,6 +282,10 @@ export function useRewardsPageState({ user, authLoading, setUser }: UseRewardsPa
     page,
     totalPages,
     totalCount,
+    pointsBalance,
+    pointsPendingRedemption,
+    pointsAvailable,
+    pointsLoading: pointsQuery.isPending || pointsQuery.isFetching,
     redeemingId,
     processingRequestId,
     pendingReward,

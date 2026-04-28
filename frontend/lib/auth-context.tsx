@@ -8,13 +8,13 @@ import {
   useState,
   ReactNode,
 } from "react";
-import { User, getCurrentUser, getUserPoints } from "@/services/api";
+import { User, getCurrentUser } from "@/services/api";
 
 interface AuthContextValue {
   user: User | null;
   loading: boolean;
   setUser: (user: User | null) => void;
-  /** Loads profile + points balance (same merge as initial session check). Call after login/signup. */
+  /** Loads authenticated identity/profile. */
   refreshUser: () => Promise<void>;
 }
 
@@ -30,13 +30,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const refreshUser = useCallback(async () => {
-    const [profile, points] = await Promise.all([getCurrentUser(), getUserPoints()]);
-    setUser({
-      ...profile,
-      points_balance: points.points_balance,
-      points_pending_redemption: points.points_pending_redemption,
-      points_available: points.points_available,
-    });
+    const profile = await getCurrentUser();
+    setUser(profile);
   }, []);
 
   useEffect(() => {

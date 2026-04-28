@@ -18,7 +18,7 @@ function SessionProbe() {
   if (loading) return <span>loading</span>;
   return (
     <div>
-      <span data-testid="balance">{user?.points_balance ?? "none"}</span>
+      <span data-testid="email">{user?.email ?? "none"}</span>
       <button type="button" onClick={() => refreshUser()}>
         Refresh
       </button>
@@ -30,14 +30,9 @@ describe("AuthProvider", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     getCurrentUserMock.mockResolvedValue({ id: 1, email: "demo@example.com" });
-    getUserPointsMock.mockResolvedValue({
-      points_balance: 810,
-      points_pending_redemption: 0,
-      points_available: 810,
-    });
   });
 
-  it("merges points_balance from getUserPoints on initial load", async () => {
+  it("loads identity profile on initial load", async () => {
     render(
       <AuthProvider>
         <SessionProbe />
@@ -45,25 +40,17 @@ describe("AuthProvider", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId("balance")).toHaveTextContent("810");
+      expect(screen.getByTestId("email")).toHaveTextContent("demo@example.com");
     });
     expect(getCurrentUserMock).toHaveBeenCalled();
-    expect(getUserPointsMock).toHaveBeenCalled();
+    expect(getUserPointsMock).not.toHaveBeenCalled();
   });
 
-  it("refreshUser reloads profile and points (e.g. after login redirects here)", async () => {
+  it("refreshUser reloads profile", async () => {
     const user = userEvent.setup();
-    getUserPointsMock
-      .mockResolvedValueOnce({
-        points_balance: 810,
-        points_pending_redemption: 0,
-        points_available: 810,
-      })
-      .mockResolvedValueOnce({
-        points_balance: 500,
-        points_pending_redemption: 0,
-        points_available: 500,
-      });
+    getCurrentUserMock
+      .mockResolvedValueOnce({ id: 1, email: "demo@example.com" })
+      .mockResolvedValueOnce({ id: 1, email: "new@example.com" });
 
     render(
       <AuthProvider>
@@ -71,14 +58,14 @@ describe("AuthProvider", () => {
       </AuthProvider>
     );
 
-    await waitFor(() => expect(screen.getByTestId("balance")).toHaveTextContent("810"));
+    await waitFor(() => expect(screen.getByTestId("email")).toHaveTextContent("demo@example.com"));
 
     await user.click(screen.getByRole("button", { name: "Refresh" }));
 
     await waitFor(() => {
-      expect(screen.getByTestId("balance")).toHaveTextContent("500");
+      expect(screen.getByTestId("email")).toHaveTextContent("new@example.com");
     });
     expect(getCurrentUserMock).toHaveBeenCalledTimes(2);
-    expect(getUserPointsMock).toHaveBeenCalledTimes(2);
+    expect(getUserPointsMock).not.toHaveBeenCalled();
   });
 });
