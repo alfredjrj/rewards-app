@@ -83,5 +83,59 @@ RSpec.describe User::Points::AvailableBalance do
         points_available: 0
       )
     end
+
+    it "keeps available points consistent while redemption transitions from processing to completed", :concurrency do
+      reward = create(:reward, points_cost: 100)
+      create(
+        :user_point_transaction,
+        user: user,
+        amount: 100,
+        running_balance: 100,
+        kind: "earn",
+        reason_code: "purchase",
+        idempotency_key: SecureRandom.uuid
+      )
+      redemption = create(
+        :user_redemption,
+        user: user,
+        reward: reward,
+        points_cost_snapshot: 100,
+        status: "processing",
+        idempotency_key: SecureRandom.uuid
+      )
+
+      writer_started = Queue.new
+      writer_done = Queue.new
+
+      writer = Thread.new do
+        ActiveRecord::Base.connection_pool.with_connection do
+          writer_started << true
+          ActiveRecord::Base.transaction do
+            redemption.reload.update!(status: "completed")
+            User::PointTransaction.create!(
+              user: user,
+              amount: -100,
+              running_balance: 0,
+              kind: "redeem",
+              reason_code: "reward_redemption",
+              idempotency_key: SecureRandom.uuid
+            )
+            sleep 0.05
+          end
+          writer_done << true
+        end
+      end
+
+      writer_started.pop
+      snapshots = []
+      250.times do
+        snapshots << described_class.call(user: user)[:points_available]
+        break unless writer_done.empty?
+      end
+      writer.join
+      50.times { snapshots << described_class.call(user: user)[:points_available] }
+
+      expect(snapshots).to all(eq(0))
+    end
   end
 end

@@ -15,7 +15,7 @@ RSpec.describe User::PointTransactions::Create do
       )
 
       expect(result.success?).to be(true)
-      transaction = result.transaction
+      transaction = result[:transaction]
       expect(transaction).to be_persisted
       expect(transaction.running_balance).to eq(300)
       expect(transaction.amount).to eq(300)
@@ -31,7 +31,7 @@ RSpec.describe User::PointTransactions::Create do
         reason_code: "purchase",
         idempotency_key: key
       )
-      first = first_result.transaction
+      first = first_result[:transaction]
 
       second_result = described_class.call(
         user: user,
@@ -40,7 +40,7 @@ RSpec.describe User::PointTransactions::Create do
         reason_code: "admin_correction",
         idempotency_key: key
       )
-      second = second_result.transaction
+      second = second_result[:transaction]
 
       expect(first_result.success?).to be(true)
       expect(second_result.success?).to be(true)
@@ -69,7 +69,7 @@ RSpec.describe User::PointTransactions::Create do
       )
 
       expect(result.success?).to be(true)
-      transaction = result.transaction
+      transaction = result[:transaction]
       expect(transaction.running_balance).to eq(380)
     end
 
@@ -96,7 +96,7 @@ RSpec.describe User::PointTransactions::Create do
       )
 
       expect(result.success?).to be(true)
-      transaction = result.transaction
+      transaction = result[:transaction]
       expect(transaction.reason).to eq("Redeemed catalog reward")
       expect(transaction.source).to eq(reward)
     end
@@ -168,6 +168,52 @@ RSpec.describe User::PointTransactions::Create do
           idempotency_key: "45dbe3f4-4ab1-4f0d-a6cb-4ec2f6f2a244"
         )
       end.to raise_error(NoMethodError, "boom")
+    end
+
+    it "allows only one concurrent debit when balance can fund one request", :concurrency do
+      create(
+        :user_point_transaction,
+        user: user,
+        amount: 100,
+        running_balance: 100,
+        kind: "earn",
+        reason_code: "purchase",
+        idempotency_key: SecureRandom.uuid
+      )
+
+      results = Queue.new
+      keys = [ SecureRandom.uuid, SecureRandom.uuid ]
+      start_gate = Queue.new
+
+      threads = keys.map do |key|
+        Thread.new do
+          ActiveRecord::Base.connection_pool.with_connection do
+            start_gate.pop
+            thread_user = User.find(user.id)
+            result = described_class.call(
+              user: thread_user,
+              amount: -80,
+              kind: "redeem",
+              reason_code: "reward_redemption",
+              idempotency_key: key
+            )
+            results << result
+          end
+        end
+      end
+
+      keys.size.times { start_gate << true }
+      threads.each(&:join)
+      concurrent_results = []
+      concurrent_results << results.pop until results.empty?
+
+      success_count = concurrent_results.count(&:success?)
+      failure_count = concurrent_results.count { |result| result.error&.dig(:code) == "insufficient_balance" }
+
+      expect(success_count).to eq(1)
+      expect(failure_count).to eq(1)
+      expect(user.point_transactions.where(amount: -80).count).to eq(1)
+      expect(user.reload.current_points_balance).to eq(20)
     end
   end
 end

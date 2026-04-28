@@ -58,7 +58,7 @@ RSpec.describe User::Redemptions::EnqueueProcessing do
       result = described_class.call(user: user, reward: reward, idempotency_key: idempotency_key)
 
       expect(result.success?).to be(true)
-      expect(result.redemption).to eq(existing)
+      expect(result[:redemption]).to eq(existing)
       expect(User::Redemptions::ProcessJob).not_to have_received(:perform_in)
       expect(user.redemptions.where(idempotency_key: idempotency_key).count).to eq(1)
     end
@@ -76,6 +76,35 @@ RSpec.describe User::Redemptions::EnqueueProcessing do
       redemption = user.redemptions.find_by(idempotency_key: idempotency_key)
       expect(redemption).to be_present
       expect(redemption.status).to eq("failed")
+    end
+
+    it "creates exactly one processing redemption under concurrent calls with same idempotency key", :concurrency do
+      allow(User::Redemptions::ProcessJob).to receive(:perform_in)
+      key = SecureRandom.uuid
+      results = Queue.new
+      thread_count = 5
+      start_gate = Queue.new
+
+      threads = thread_count.times.map do
+        Thread.new do
+          ActiveRecord::Base.connection_pool.with_connection do
+            start_gate.pop
+            thread_user = User.find(user.id)
+            thread_reward = Reward.find(reward.id)
+            results << described_class.call(user: thread_user, reward: thread_reward, idempotency_key: key)
+          end
+        end
+      end
+
+      thread_count.times { start_gate << true }
+      threads.each(&:join)
+
+      all_results = []
+      all_results << results.pop until results.empty?
+
+      expect(all_results).to all(satisfy(&:success?))
+      expect(user.redemptions.where(idempotency_key: key).count).to eq(1)
+      expect(User::Redemptions::ProcessJob).to have_received(:perform_in).once
     end
   end
 end
