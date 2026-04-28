@@ -10,6 +10,10 @@ module User::Redemptions
       ActionCable.server.broadcast(channel_name(user_id: user_id), payload)
     end
 
+    def self.read(user_id:, request_id:)
+      Rails.cache.read(cache_key(user_id: user_id, request_id: request_id))
+    end
+
     def self.cache_key(user_id:, request_id:)
       "#{CACHE_PREFIX}:#{user_id}:#{request_id}"
     end

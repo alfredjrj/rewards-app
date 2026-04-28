@@ -51,15 +51,16 @@ class Api::V1::User::RedemptionsController < AuthenticationController
   end
 
   def show
-    authorize User::Redemption, :show?
-
     request_id = params[:id].to_s
 
     # Polling fallback for async redemptions:
     # ProcessJob writes request-scoped status to cache and broadcasts via Action Cable.
     # We read cache first for fast completion/failure lookup, then fall back to DB
     # (idempotency_key match) when cache is missing/expired.
-    cached_status = Rails.cache.read(cache_key_for(request_id))
+    cached_status = User::Redemptions::StatusPublisher.read(
+      user_id: current_user.id,
+      request_id: request_id
+    )
     if cached_status.present?
       payload = cached_status.to_h.stringify_keys
       render json: ::Api::V1::User::RedemptionSerializer::Status.call(
@@ -82,6 +83,7 @@ class Api::V1::User::RedemptionsController < AuthenticationController
       return
     end
 
+    skip_authorization
     render json: {
       error: {
         code: "not_found",
@@ -93,10 +95,6 @@ class Api::V1::User::RedemptionsController < AuthenticationController
   private
   def redemption_params
     params.require(:redemption).permit(:reward_id)
-  end
-
-  def cache_key_for(request_id)
-    "redemption_request_status:user:#{current_user.id}:#{request_id}"
   end
 
   def existing_redemption_for(idempotency_key)

@@ -11,7 +11,8 @@ class Users::SessionsController < Devise::SessionsController
     sign_in(resource_name, resource)
     render json: {
       message: "Signed in successfully",
-      user: user_json(resource)
+      user: user_json(resource),
+      meta: { csrf_token: form_authenticity_token }
     }, status: :ok
   end
 

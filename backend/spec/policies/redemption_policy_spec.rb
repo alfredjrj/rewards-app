@@ -78,10 +78,11 @@ RSpec.describe User::RedemptionPolicy do
   describe "#show?" do
     let(:user) { create(:user) }
 
-    it "allows class-level show checks for authenticated users" do
-      policy = User::RedemptionPolicy.new(user, User::Redemption)
+    it "denies unauthenticated users" do
+      redemption = create(:user_redemption, user: user)
+      policy = User::RedemptionPolicy.new(nil, redemption)
 
-      expect(policy.show?).to be(true)
+      expect(policy.show?).to be(false)
     end
 
     it "allows reading own redemption" do

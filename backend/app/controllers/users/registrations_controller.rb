@@ -8,7 +8,8 @@ class Users::RegistrationsController < Devise::RegistrationsController
       sign_in(resource_name, resource)
       render json: {
         message: "Account created successfully",
-        user: user_json(resource)
+        user: user_json(resource),
+        meta: { csrf_token: form_authenticity_token }
       }, status: :created
     else
       render json: { errors: resource.errors.full_messages }, status: :unprocessable_entity

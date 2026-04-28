@@ -71,7 +71,7 @@ module User::PointTransactions
     end
 
     def latest_running_balance
-      user.point_transactions.order(created_at: :desc, id: :desc).pick(:running_balance) || 0
+      user.current_points_balance
     end
 
     def success(transaction)

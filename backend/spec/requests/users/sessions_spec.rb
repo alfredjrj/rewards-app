@@ -26,6 +26,7 @@ RSpec.describe "User sessions", type: :request do
       expect(response).to have_http_status(:ok)
       json = JSON.parse(response.body)
       expect(json["user"]).to include("id" => user.id, "email" => user.email)
+      expect(json.dig("meta", "csrf_token")).to be_present
     end
   end
 end

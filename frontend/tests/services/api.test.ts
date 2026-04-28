@@ -116,12 +116,21 @@ describe("services/api", () => {
 
   it("uses expected paths for signup and logout", async () => {
     const { signup, logout } = await import("@/services/api");
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      headers: { get: () => "application/json" },
-      json: async () => ({}),
-      text: async () => "{}",
-    });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        headers: { get: () => "application/json" },
+        json: async () => ({ user: { id: 2, email: "new@example.com" }, meta: { csrf_token: "csrf-signup" } }),
+        text: async () =>
+          JSON.stringify({ user: { id: 2, email: "new@example.com" }, meta: { csrf_token: "csrf-signup" } }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        headers: { get: () => "application/json" },
+        json: async () => ({}),
+        text: async () => "{}",
+      });
     vi.stubGlobal("fetch", fetchMock);
 
     await signup("new@example.com", "password123", "password123");
@@ -137,6 +146,94 @@ describe("services/api", () => {
       `${TEST_API_ORIGIN}/users/sign_out`,
       expect.objectContaining({ method: "DELETE" })
     );
+  });
+
+  it("captures csrf token from login and uses it on next unsafe request", async () => {
+    const { login, redeemReward } = await import("@/services/api");
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        headers: { get: () => "application/json" },
+        json: async () => ({ user: { id: 1, email: "demo@example.com" }, meta: { csrf_token: "csrf-login" } }),
+        text: async () =>
+          JSON.stringify({ user: { id: 1, email: "demo@example.com" }, meta: { csrf_token: "csrf-login" } }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        headers: { get: () => "application/json" },
+        json: async () => ({ data: { reward_id: 2, status: "processing", request_id: "req-1" } }),
+        text: async () => JSON.stringify({ data: { reward_id: 2, status: "processing", request_id: "req-1" } }),
+      });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await login("demo@example.com", "password123");
+    await redeemReward(2, "idem-123");
+
+    const options = fetchMock.mock.calls[1]?.[1] as RequestInit;
+    const headers = options.headers as Headers;
+    expect(headers.get("X-CSRF-Token")).toBe("csrf-login");
+  });
+
+  it("captures csrf token from signup and uses it on next unsafe request", async () => {
+    const { signup, redeemReward } = await import("@/services/api");
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        headers: { get: () => "application/json" },
+        json: async () => ({ user: { id: 2, email: "new@example.com" }, meta: { csrf_token: "csrf-signup" } }),
+        text: async () =>
+          JSON.stringify({ user: { id: 2, email: "new@example.com" }, meta: { csrf_token: "csrf-signup" } }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        headers: { get: () => "application/json" },
+        json: async () => ({ data: { reward_id: 2, status: "processing", request_id: "req-1" } }),
+        text: async () => JSON.stringify({ data: { reward_id: 2, status: "processing", request_id: "req-1" } }),
+      });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await signup("new@example.com", "password123", "password123");
+    await redeemReward(2, "idem-123");
+
+    const options = fetchMock.mock.calls[1]?.[1] as RequestInit;
+    const headers = options.headers as Headers;
+    expect(headers.get("X-CSRF-Token")).toBe("csrf-signup");
+  });
+
+  it("clears csrf token on logout so later unsafe requests do not send stale token", async () => {
+    const { getCurrentUser, logout, redeemReward } = await import("@/services/api");
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        headers: { get: () => "application/json" },
+        json: async () => ({ data: { id: 1, email: "demo@example.com" }, meta: { csrf_token: "csrf-123" } }),
+        text: async () =>
+          JSON.stringify({ data: { id: 1, email: "demo@example.com" }, meta: { csrf_token: "csrf-123" } }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        headers: { get: () => "application/json" },
+        json: async () => ({}),
+        text: async () => "{}",
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        headers: { get: () => "application/json" },
+        json: async () => ({ data: { reward_id: 2, status: "processing", request_id: "req-1" } }),
+        text: async () => JSON.stringify({ data: { reward_id: 2, status: "processing", request_id: "req-1" } }),
+      });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await getCurrentUser();
+    await logout();
+    await redeemReward(2, "idem-123");
+
+    const options = fetchMock.mock.calls[2]?.[1] as RequestInit;
+    const headers = options.headers as Headers;
+    expect(headers.get("X-CSRF-Token")).toBeNull();
   });
 
   it("uses user-scoped redemptions endpoint", async () => {

@@ -17,6 +17,13 @@ export interface UserProfileResponse {
   };
 }
 
+type AuthUserResponse = {
+  user: User;
+  meta?: {
+    csrf_token?: string;
+  };
+};
+
 export interface UserPoints {
   data: {
     points_balance: number;
@@ -210,10 +217,12 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 }
 
 export async function login(email: string, password: string): Promise<{ user: User }> {
-  return request("/users/sign_in", {
+  const payload = await request<AuthUserResponse>("/users/sign_in", {
     method: "POST",
     body: JSON.stringify({ user: { email, password } }),
   });
+  csrfToken = payload.meta?.csrf_token || null;
+  return { user: payload.user };
 }
 
 export async function signup(
@@ -221,16 +230,19 @@ export async function signup(
   password: string,
   passwordConfirmation: string
 ): Promise<{ user: User }> {
-  return request("/users", {
+  const payload = await request<AuthUserResponse>("/users", {
     method: "POST",
     body: JSON.stringify({
       user: { email, password, password_confirmation: passwordConfirmation },
     }),
   });
+  csrfToken = payload.meta?.csrf_token || null;
+  return { user: payload.user };
 }
 
 export async function logout(): Promise<void> {
   await request("/users/sign_out", { method: "DELETE" });
+  csrfToken = null;
 }
 
 export async function getCurrentUser(): Promise<User> {

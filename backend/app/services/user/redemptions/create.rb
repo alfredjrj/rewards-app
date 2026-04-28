@@ -68,7 +68,7 @@ module User::Redemptions
     attr_reader :user, :reward, :idempotency_key
 
     def current_points_balance
-      user.point_transactions.order(created_at: :desc, id: :desc).pick(:running_balance) || 0
+      user.current_points_balance
     end
 
     def success(redemption, points_balance)
