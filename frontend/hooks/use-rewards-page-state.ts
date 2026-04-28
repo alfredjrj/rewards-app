@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { fetchRewards, getRedemptionStatus, getUserPoints, redeemReward, Reward } from "@/services/api";
+import { fetchRewards, getRedemptionStatus, getUserPoints, redeemReward, Reward, RedemptionResultData } from "@/services/api";
 import { User } from "@/services/api";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { getCableConsumer } from "@/lib/cable";
@@ -137,15 +137,17 @@ export function useRewardsPageState({ user, authLoading }: UseRewardsPageStateAr
     setRedeemError("");
     try {
       const payload = await redeemMutation.mutateAsync({ rewardId: reward.id, idempotencyKey });
-      if (payload.data.status === "processing" && payload.data.request_id) {
+      if (payload.data.status === "processing") {
         setProcessingRequestId(payload.data.request_id);
         setProcessingReward(reward);
         await queryClient.invalidateQueries({ queryKey: pointsQueryKey });
       } else {
+        const updatedPointsBalance =
+          payload.data.status === "completed" ? payload.data.points_balance : pointsBalance;
         setRedemptionSuccess({
           rewardTitle: reward.title,
           pointsSpent: reward.points_cost,
-          pointsBalance: payload.data.points_balance ?? pointsBalance,
+          pointsBalance: updatedPointsBalance,
         });
         await queryClient.invalidateQueries({ queryKey: pointsQueryKey });
       }
@@ -202,11 +204,7 @@ export function useRewardsPageState({ user, authLoading }: UseRewardsPageStateAr
   useEffect(() => {
     if (!processingRequestId) return;
 
-    async function handleCompletion(payload: {
-      request_id?: string;
-      status?: string;
-      error?: { message?: string };
-    }) {
+    async function handleCompletion(payload: RedemptionResultData & { request_id?: string }) {
       if (payload.request_id !== processingRequestId) return;
 
       if (payload.status === "completed" && processingRewardRef.current) {
@@ -233,7 +231,7 @@ export function useRewardsPageState({ user, authLoading }: UseRewardsPageStateAr
       }
 
       if (payload.status === "failed") {
-        setRedeemError(payload.error?.message || "Failed to redeem reward");
+        setRedeemError(payload.error.message || "Failed to redeem reward");
         setProcessingRequestId(null);
         setProcessingReward(null);
         void queryClient.invalidateQueries({ queryKey: pointsQueryKeyRef.current });
@@ -245,7 +243,7 @@ export function useRewardsPageState({ user, authLoading }: UseRewardsPageStateAr
       {
         received: (payload: unknown) => {
           if (!payload || typeof payload !== "object") return;
-          void handleCompletion(payload as { request_id?: string; status?: string; error?: { message?: string } });
+          void handleCompletion(payload as RedemptionResultData & { request_id?: string });
         },
       }
     );

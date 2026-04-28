@@ -26,17 +26,20 @@ describe("services/api", () => {
 
     await login("demo@example.com", "password123");
 
+    expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock).toHaveBeenCalledWith(
       `${TEST_API_ORIGIN}/users/sign_in`,
       expect.objectContaining({
         method: "POST",
         credentials: "include",
-        headers: expect.objectContaining({ "Content-Type": "application/json" }),
         body: JSON.stringify({
           user: { email: "demo@example.com", password: "password123" },
         }),
       })
     );
+    const options = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    const headers = options.headers as Headers;
+    expect(headers.get("Content-Type")).toBe("application/json");
   });
 
   it("throws backend error message for failed login", async () => {
@@ -156,9 +159,52 @@ describe("services/api", () => {
       expect.objectContaining({
         method: "POST",
         body: JSON.stringify({ redemption: { reward_id: 2 } }),
-        headers: expect.objectContaining({ "Idempotency-Key": "idem-123" }),
       })
     );
+    const options = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    const headers = options.headers as Headers;
+    expect(headers.get("Idempotency-Key")).toBe("idem-123");
+  });
+
+  it("attaches X-CSRF-Token to unsafe requests after bootstrap user fetch", async () => {
+    const { getCurrentUser, redeemReward } = await import("@/services/api");
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        headers: { get: () => "application/json" },
+        json: async () => ({
+          data: { id: 1, email: "demo@example.com" },
+          meta: { csrf_token: "csrf-123" },
+        }),
+        text: async () =>
+          JSON.stringify({
+            data: { id: 1, email: "demo@example.com" },
+            meta: { csrf_token: "csrf-123" },
+          }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        headers: { get: () => "application/json" },
+        json: async () => ({ data: { reward_id: 2, status: "processing", request_id: "req-1" } }),
+        text: async () => JSON.stringify({ data: { reward_id: 2, status: "processing", request_id: "req-1" } }),
+      });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await getCurrentUser();
+    await redeemReward(2, "idem-123");
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      `${TEST_API_ORIGIN}/api/v1/user/redemptions`,
+      expect.objectContaining({
+        method: "POST",
+      })
+    );
+    const options = fetchMock.mock.calls[1]?.[1] as RequestInit;
+    const headers = options.headers as Headers;
+    expect(headers.get("X-CSRF-Token")).toBe("csrf-123");
+    expect(headers.get("Idempotency-Key")).toBe("idem-123");
   });
 
   it("fetches user redemption history with pagination params", async () => {

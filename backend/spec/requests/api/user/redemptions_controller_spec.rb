@@ -112,6 +112,7 @@ RSpec.describe "Api::V1::User::RedemptionsController", type: :request do
 
     context "when signed in" do
       let(:user) { create(:user) }
+      let(:csrf_token) { @csrf_token }
 
       before do
         sign_in user
@@ -124,6 +125,9 @@ RSpec.describe "Api::V1::User::RedemptionsController", type: :request do
           reason_code: "purchase",
           idempotency_key: "e3e1e313-a70b-4dbc-81e0-f6868503595d"
         )
+        get "/api/v1/user"
+        @csrf_token = JSON.parse(response.body).dig("meta", "csrf_token")
+        sign_in user
       end
 
       it "enqueues async redemption processing and returns processing state" do
@@ -132,7 +136,7 @@ RSpec.describe "Api::V1::User::RedemptionsController", type: :request do
 
         post "/api/v1/user/redemptions",
              params: { redemption: { reward_id: reward.id } },
-             headers: { "Idempotency-Key" => key }
+             headers: { "Idempotency-Key" => key, "X-CSRF-Token" => csrf_token }
 
         expect(User::Redemptions::ProcessJob).to have_received(:perform_in).with(
           2.seconds,
@@ -157,7 +161,8 @@ RSpec.describe "Api::V1::User::RedemptionsController", type: :request do
         allow(User::Redemptions::ProcessJob).to receive(:perform_in)
 
         post "/api/v1/user/redemptions",
-             params: { redemption: { reward_id: reward.id } }
+             params: { redemption: { reward_id: reward.id } },
+             headers: { "X-CSRF-Token" => csrf_token }
 
         expect(response).to have_http_status(:bad_request)
         expect(JSON.parse(response.body)).to eq(
@@ -174,7 +179,7 @@ RSpec.describe "Api::V1::User::RedemptionsController", type: :request do
 
         post "/api/v1/user/redemptions",
              params: { redemption: { reward_id: reward.id } },
-             headers: { "Idempotency-Key" => "bad key with spaces" }
+             headers: { "Idempotency-Key" => "bad key with spaces", "X-CSRF-Token" => csrf_token }
 
         expect(response).to have_http_status(:bad_request)
         expect(JSON.parse(response.body)).to eq(
@@ -193,7 +198,7 @@ RSpec.describe "Api::V1::User::RedemptionsController", type: :request do
 
         post "/api/v1/user/redemptions",
              params: { redemption: { reward_id: reward.id } },
-             headers: { "Idempotency-Key" => key }
+             headers: { "Idempotency-Key" => key, "X-CSRF-Token" => csrf_token }
 
         expect(User::Redemptions::ProcessJob).not_to have_received(:perform_in)
         expect(response).to have_http_status(:ok)
@@ -211,7 +216,7 @@ RSpec.describe "Api::V1::User::RedemptionsController", type: :request do
 
         post "/api/v1/user/redemptions",
              params: { redemption: { reward_id: reward.id } },
-             headers: { "Idempotency-Key" => key }
+             headers: { "Idempotency-Key" => key, "X-CSRF-Token" => csrf_token }
 
         expect(response).to have_http_status(:ok)
         expect(User::Redemptions::ProcessJob).not_to have_received(:perform_in)
@@ -227,7 +232,7 @@ RSpec.describe "Api::V1::User::RedemptionsController", type: :request do
 
         post "/api/v1/user/redemptions",
              params: { redemption: { reward_id: unavailable_reward.id } },
-             headers: { "Idempotency-Key" => key }
+             headers: { "Idempotency-Key" => key, "X-CSRF-Token" => csrf_token }
 
         expect(response).to have_http_status(:forbidden)
         expect(JSON.parse(response.body)).to eq(
@@ -246,7 +251,7 @@ RSpec.describe "Api::V1::User::RedemptionsController", type: :request do
 
         post "/api/v1/user/redemptions",
              params: { redemption: { reward_id: 99_999_999 } },
-             headers: { "Idempotency-Key" => key }
+             headers: { "Idempotency-Key" => key, "X-CSRF-Token" => csrf_token }
 
         expect(response).to have_http_status(:not_found)
         expect(JSON.parse(response.body)).to eq(
@@ -264,7 +269,7 @@ RSpec.describe "Api::V1::User::RedemptionsController", type: :request do
 
         post "/api/v1/user/redemptions",
              params: {},
-             headers: { "Idempotency-Key" => key }
+             headers: { "Idempotency-Key" => key, "X-CSRF-Token" => csrf_token }
 
         expect(response).to have_http_status(:bad_request)
         expect(JSON.parse(response.body)).to eq(
@@ -283,7 +288,7 @@ RSpec.describe "Api::V1::User::RedemptionsController", type: :request do
 
         post "/api/v1/user/redemptions",
              params: { redemption: { reward_id: expensive_reward.id } },
-             headers: { "Idempotency-Key" => key }
+             headers: { "Idempotency-Key" => key, "X-CSRF-Token" => csrf_token }
 
         expect(response).to have_http_status(:unprocessable_entity)
         expect(JSON.parse(response.body)).to eq(
@@ -310,7 +315,7 @@ RSpec.describe "Api::V1::User::RedemptionsController", type: :request do
 
         post "/api/v1/user/redemptions",
              params: { redemption: { reward_id: reward.id } },
-             headers: { "Idempotency-Key" => key }
+             headers: { "Idempotency-Key" => key, "X-CSRF-Token" => csrf_token }
 
         expect(response).to have_http_status(:unprocessable_entity)
         expect(JSON.parse(response.body)).to eq(
@@ -321,6 +326,24 @@ RSpec.describe "Api::V1::User::RedemptionsController", type: :request do
         )
         expect(User::Redemptions::ProcessJob).not_to have_received(:perform_in)
         expect(user.redemptions.find_by(idempotency_key: key)).to be_nil
+      end
+
+      it "returns forbidden when csrf token is missing" do
+        key = "csfr-missing-14a3f0ff-62d9-4cc8-af5f-07d0ff67ad7b"
+        allow(User::Redemptions::ProcessJob).to receive(:perform_in)
+
+        post "/api/v1/user/redemptions",
+             params: { redemption: { reward_id: reward.id } },
+             headers: { "Idempotency-Key" => key }
+
+        expect(response).to have_http_status(:forbidden)
+        expect(JSON.parse(response.body)).to eq(
+          "error" => {
+            "code" => "invalid_csrf_token",
+            "message" => "X-CSRF-Token is missing or invalid"
+          }
+        )
+        expect(User::Redemptions::ProcessJob).not_to have_received(:perform_in)
       end
     end
   end

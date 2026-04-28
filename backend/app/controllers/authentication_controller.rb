@@ -2,6 +2,7 @@ class AuthenticationController < ApplicationController
   include Pundit::Authorization
 
   before_action :authenticate_user!
+  before_action :verify_csrf_token!, unless: :safe_http_method?
   after_action :verify_pundit_authorization!, unless: :devise_controller?
   rescue_from Pundit::NotAuthorizedError, with: :user_not_authorized
   rescue_from ActiveRecord::RecordNotFound, with: :record_not_found
@@ -17,6 +18,19 @@ class AuthenticationController < ApplicationController
     return if current_user
 
     render json: { error: "Not authenticated" }, status: :unauthorized
+  end
+
+  def verify_csrf_token!
+    return unless current_user
+    return if valid_authenticity_token?(session, request.headers["X-CSRF-Token"].to_s)
+
+    skip_authorization
+    render json: {
+      error: {
+        code: "invalid_csrf_token",
+        message: "X-CSRF-Token is missing or invalid"
+      }
+    }, status: :forbidden
   end
 
   def user_not_authorized
@@ -51,5 +65,9 @@ class AuthenticationController < ApplicationController
 
     verify_authorized
     verify_policy_scoped if action_name == "index"
+  end
+
+  def safe_http_method?
+    request.get? || request.head? || request.options?
   end
 end

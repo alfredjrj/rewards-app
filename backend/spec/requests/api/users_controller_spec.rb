@@ -21,12 +21,11 @@ RSpec.describe "Api::V1::UsersController", type: :request do
 
         expect(response).to have_http_status(:ok)
         body = JSON.parse(response.body)
-        expect(body).to eq(
-          "data" => {
-            "id" => user.id,
-            "email" => user.email
-          }
+        expect(body["data"]).to eq(
+          "id" => user.id,
+          "email" => user.email
         )
+        expect(body.dig("meta", "csrf_token")).to be_present
       end
     end
   end

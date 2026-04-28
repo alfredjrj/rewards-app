@@ -4,7 +4,7 @@ export interface User {
   id: number;
   email: string;
   points_balance?: number;
-  /** Points reserved for in-flight async redemptions (server uses Redis; see API). */
+  /** Points reserved by DB-backed redemptions in processing status. */
   points_pending_redemption?: number;
   /** Ledger balance minus pending; spendable before jobs finish. */
   points_available?: number;
@@ -12,6 +12,9 @@ export interface User {
 
 export interface UserProfileResponse {
   data: User;
+  meta?: {
+    csrf_token?: string;
+  };
 }
 
 export interface UserPoints {
@@ -99,6 +102,13 @@ export interface FetchRewardsOptions {
   sort?: "title" | "-title" | "points_cost" | "-points_cost" | "created_at" | "-created_at";
 }
 
+let csrfToken: string | null = null;
+
+function methodIsUnsafe(method?: string): boolean {
+  const normalized = (method || "GET").toUpperCase();
+  return !["GET", "HEAD", "OPTIONS"].includes(normalized);
+}
+
 function parseErrorMessage(data: unknown): string {
   if (!data || typeof data !== "object") return "Request failed";
 
@@ -154,16 +164,19 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     options.signal.addEventListener("abort", () => controller.abort(), { once: true });
   }
 
+  const requestHeaders = new Headers(options.headers);
+  requestHeaders.set("Content-Type", "application/json");
+  if (methodIsUnsafe(options.method) && csrfToken) {
+    requestHeaders.set("X-CSRF-Token", csrfToken);
+  }
+
   let res: Response;
   try {
     res = await fetch(`${getPublicApiUrl()}${path}`, {
       ...options,
       credentials: "include",
       signal: controller.signal,
-      headers: {
-        "Content-Type": "application/json",
-        ...options.headers,
-      },
+      headers: requestHeaders,
     });
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
@@ -222,6 +235,7 @@ export async function logout(): Promise<void> {
 
 export async function getCurrentUser(): Promise<User> {
   const payload = await request<UserProfileResponse>("/api/v1/user");
+  csrfToken = payload.meta?.csrf_token || null;
   return payload.data;
 }
 

@@ -2,6 +2,8 @@ class Api::V1::UsersController < AuthenticationController
   def show
     authorize current_user, :show?
 
-    render json: ::Api::V1::User::ProfileSerializer.call(user: current_user)
+    render json: ::Api::V1::User::ProfileSerializer.call(user: current_user).merge(
+      meta: { csrf_token: form_authenticity_token }
+    )
   end
 end
