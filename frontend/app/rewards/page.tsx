@@ -248,7 +248,7 @@ export default function RewardsPage() {
                     disabled={
                       !reward.is_available ||
                       redeemingId === reward.id ||
-                      (user.points_balance ?? 0) < reward.points_cost
+                      (user.points_available ?? user.points_balance ?? 0) < reward.points_cost
                     }
                     onClick={() => openRedeemModal(reward)}
                     className="px-3 py-1.5 rounded-lg border border-purple-200 text-xs font-medium text-purple-700 disabled:opacity-50"

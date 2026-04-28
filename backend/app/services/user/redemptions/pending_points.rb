@@ -14,8 +14,25 @@ module User::Redemptions
   # spendable points may be overstated briefly.
   class PendingPoints
     CLAIM_PREFIX = "rp:claim:v1:"
-    TOTAL_PREFIX = "rp:pending:user:v1:"
+    TOTAL_PENDING_PREFIX = "rp:pending:user:v1:"
     CLAIM_TTL_SECONDS = 24.hours.to_i
+    RELEASE_CLAIM_LUA = <<~LUA.freeze
+      local claim_key = KEYS[1]
+      local total_key = KEYS[2]
+      local claim_points = redis.call("GET", claim_key)
+      if not claim_points then
+        return 0
+      end
+
+      redis.call("DEL", claim_key)
+      local new_total = redis.call("DECRBY", total_key, claim_points)
+      if new_total < 0 then
+        redis.call("SET", total_key, 0)
+        new_total = 0
+      end
+
+      return new_total
+    LUA
 
     REDIS_ERRORS = [ Redis::BaseConnectionError, Redis::TimeoutError ].freeze
 
@@ -54,23 +71,17 @@ module User::Redemptions
         created = redis.set(claim, points, nx: true, ex: CLAIM_TTL_SECONDS)
         return false unless created
 
-        redis.incrby(total_key(user_id), points)
+        redis.incrby(total_pending_key(user_id), points)
         true
       end
 
       def release_claim_if_present(redis, user_id:, request_id:)
         claim = claim_key(request_id)
-        raw = redis.get(claim)
-        return if raw.blank?
-
-        points = raw.to_i
-        redis.del(claim)
-        new_total = redis.decrby(total_key(user_id), points)
-        redis.set(total_key(user_id), 0) if new_total.negative?
+        redis.eval(RELEASE_CLAIM_LUA, keys: [ claim, total_pending_key(user_id) ], argv: [])
       end
 
       def read_pending_total(redis, user_id:)
-        (redis.get(total_key(user_id)) || 0).to_i
+        (redis.get(total_pending_key(user_id)) || 0).to_i
       end
 
       def redis_guard(fallback)
@@ -88,8 +99,8 @@ module User::Redemptions
         "#{CLAIM_PREFIX}#{request_id}"
       end
 
-      def total_key(user_id)
-        "#{TOTAL_PREFIX}#{user_id}"
+      def total_pending_key(user_id)
+        "#{TOTAL_PENDING_PREFIX}#{user_id}"
       end
 
       def redis_url

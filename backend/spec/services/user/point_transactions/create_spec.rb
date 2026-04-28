@@ -155,5 +155,19 @@ RSpec.describe User::PointTransactions::Create do
       expect(result.error[:details]).to include(:reason_code)
       expect(user.point_transactions.count).to eq(0)
     end
+
+    it "re-raises unexpected exceptions so retry/error monitoring can see them" do
+      allow(user).to receive(:with_lock).and_raise(NoMethodError, "boom")
+
+      expect do
+        described_class.call(
+          user: user,
+          amount: 100,
+          kind: "earn",
+          reason_code: "purchase",
+          idempotency_key: "45dbe3f4-4ab1-4f0d-a6cb-4ec2f6f2a244"
+        )
+      end.to raise_error(NoMethodError, "boom")
+    end
   end
 end

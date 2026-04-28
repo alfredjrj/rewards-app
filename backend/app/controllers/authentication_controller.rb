@@ -2,7 +2,7 @@ class AuthenticationController < ApplicationController
   include Pundit::Authorization
 
   before_action :authenticate_user!
-  after_action :verify_pundit_authorization!
+  after_action :verify_pundit_authorization!, unless: :devise_controller?
   rescue_from Pundit::NotAuthorizedError, with: :user_not_authorized
 
   private
@@ -22,6 +22,8 @@ class AuthenticationController < ApplicationController
   end
 
   def verify_pundit_authorization!
+    return unless current_user
+
     verify_authorized
     verify_policy_scoped if action_name == "index"
   end

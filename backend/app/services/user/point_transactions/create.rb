@@ -1,3 +1,9 @@
+# Ledger-style point accounting: each change is an immutable row with amount and a denormalized
+# running_balance snapshot. That beats the main alternative—a single mutable points counter on User—
+# because we keep a full audit trail (kind/reason/source), enforce non-negative balances from history,
+# and reuse idempotency keys per movement without guessing “current balance” under retries. Appending
+# rows plus user-level locking stays correct under concurrency; a lone counter cannot explain *why*
+# the balance changed or replay safely after partial failures.
 module User::PointTransactions
   class Create
     Result = Struct.new(:success?, :transaction, :error, keyword_init: true)
@@ -48,14 +54,12 @@ module User::PointTransactions
       end
     rescue ActiveRecord::RecordInvalid => e
       log(:warn, "validation_failed", error_class: e.class.name)
+      Rails.logger.warn(e.full_message)
       failure(
         "validation_error",
         "Point transaction is invalid",
         details: e.record.errors.to_hash(true)
       )
-    rescue StandardError => e
-      log(:error, "failed", error_class: e.class.name, error_message: e.message)
-      failure("internal_error", "Unable to create point transaction")
     end
 
     private

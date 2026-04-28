@@ -16,14 +16,14 @@ RSpec.describe "db/seeds.rb" do
     expect(user).to be_present
     expect(user.admin).to be(true)
     expect(Reward.count).to eq(35)
-    expect(redemptions.count).to eq(11)
+    expect(redemptions.count).to eq(13)
     expect(point_transactions.count).to eq(15)
     expect(redeem_transactions.count).to eq(11)
-    expect(point_transactions.last.running_balance).to eq(810)
+    expect(point_transactions.last.running_balance).to eq(3810)
     expect(redeem_transactions.pluck(:source_type).uniq).to eq([ "User::Redemption" ])
     expect(
       redeem_transactions.pluck(:source_id).sort
-    ).to eq(redemptions.pluck(:id).sort)
+    ).to eq(redemptions.where(status: "completed").pluck(:id).sort)
 
     cumulative_balance = 0
     point_transactions.each do |transaction|
@@ -43,6 +43,6 @@ RSpec.describe "db/seeds.rb" do
 
     expect(Reward.count).to eq(35)
     expect(point_transactions.count).to eq(15)
-    expect(redemptions.count).to eq(11)
+    expect(redemptions.count).to eq(13)
   end
 end

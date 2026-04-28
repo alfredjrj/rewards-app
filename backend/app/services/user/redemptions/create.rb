@@ -41,13 +41,12 @@ module User::Redemptions
         success(redemption, points_result.transaction.running_balance)
       end
     rescue ActiveRecord::RecordInvalid => e
+      Rails.logger.warn(e.full_message)
       failure(
         "validation_error",
         "Redemption is invalid",
         details: e.record.errors.to_hash(true)
       )
-    rescue StandardError
-      failure("internal_error", "Unable to redeem reward")
     end
 
     private

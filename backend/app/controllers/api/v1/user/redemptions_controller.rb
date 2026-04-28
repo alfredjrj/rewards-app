@@ -24,8 +24,8 @@ class Api::V1::User::RedemptionsController < AuthenticationController
   end
 
   def create
-    reward = ::Reward.find(redemption_params[:reward_id])
     authorize :redemption, :create?
+    reward = ::Reward.find(redemption_params[:reward_id])
 
     idempotency_key = request.headers["Idempotency-Key"].presence || SecureRandom.uuid
     # Mirror Sidekiq intent in Redis so GET /points can subtract pending before the ledger debit

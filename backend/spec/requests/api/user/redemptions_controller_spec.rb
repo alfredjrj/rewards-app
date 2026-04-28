@@ -142,7 +142,7 @@ RSpec.describe "Api::V1::User::RedemptionsController", type: :request do
         )
 
         expect(User::Redemptions::ProcessJob).to have_received(:perform_in).with(
-          1.second,
+          2.seconds,
           user.id,
           reward.id,
           key

@@ -28,20 +28,28 @@ RSpec.describe User::Redemptions::PendingPoints do
   end
 
   describe ".release!" do
-    it "deletes claim and decrements total" do
-      allow(redis).to receive(:get).with("rp:claim:v1:req-1").and_return("100")
-      allow(redis).to receive(:del).with("rp:claim:v1:req-1")
-      allow(redis).to receive(:decrby).with("rp:pending:user:v1:42", 100).and_return(0)
+    it "atomically releases claim and decrements total via Lua" do
+      allow(redis).to receive(:eval).and_return(0)
 
       described_class.release!(user_id: 42, request_id: "req-1")
+
+      expect(redis).to have_received(:eval).with(
+        described_class::RELEASE_CLAIM_LUA,
+        keys: [ "rp:claim:v1:req-1", "rp:pending:user:v1:42" ],
+        argv: []
+      )
     end
 
     it "no-ops when claim is missing" do
-      allow(redis).to receive(:get).with("rp:claim:v1:req-1").and_return(nil)
+      allow(redis).to receive(:eval).and_return(0)
 
       described_class.release!(user_id: 42, request_id: "req-1")
 
-      expect(redis).not_to receive(:decrby)
+      expect(redis).to have_received(:eval).with(
+        described_class::RELEASE_CLAIM_LUA,
+        keys: [ "rp:claim:v1:req-1", "rp:pending:user:v1:42" ],
+        argv: []
+      )
     end
   end
 

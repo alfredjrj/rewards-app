@@ -70,5 +70,13 @@ RSpec.describe User::Redemptions::Create do
       expect(user.point_transactions.count).to eq(1)
       expect(user.point_transactions.order(:id).last.running_balance).to eq(500)
     end
+
+    it "re-raises unexpected exceptions so retries/error monitoring can capture them" do
+      allow(User::PointTransactions::Create).to receive(:call).and_raise(NoMethodError, "boom")
+
+      expect do
+        described_class.call(user: user, reward: reward, idempotency_key: idempotency_key)
+      end.to raise_error(NoMethodError, "boom")
+    end
   end
 end

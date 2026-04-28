@@ -5,6 +5,12 @@ import { useAuth } from "@/lib/auth-context";
 import RedemptionsTableSkeleton from "@/components/redemptions/redemptions-table-skeleton";
 import { useRedemptionsPageState } from "@/hooks/use-redemptions-page-state";
 
+const STATUS_BADGE_STYLES: Record<string, string> = {
+  completed: "bg-green-100 text-green-800",
+  failed: "bg-rose-100 text-rose-800",
+  cancelled: "bg-zinc-200 text-zinc-800",
+};
+
 export default function RedemptionsPage() {
   const { user, loading: authLoading } = useAuth();
   const {
@@ -143,7 +149,11 @@ export default function RedemptionsPage() {
                   <div className="col-span-5 text-gray-900 font-medium">{row.reward_title}</div>
                   <div className="col-span-2 text-purple-700 font-semibold">{row.points_cost_snapshot}</div>
                   <div className="col-span-2">
-                    <span className="inline-flex px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                    <span
+                      className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
+                        STATUS_BADGE_STYLES[row.status] || "bg-slate-100 text-slate-800"
+                      }`}
+                    >
                       {row.status}
                     </span>
                   </div>

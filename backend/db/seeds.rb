@@ -1,3 +1,5 @@
+raise "do not seed demo users in production" if Rails.env.production?
+
 user = User.find_or_initialize_by(email: "demo@example.com")
 user.assign_attributes(
   password: "password123",
@@ -316,6 +318,25 @@ user_redemptions_seed.each do |attrs|
   )
 
   puts "Redemption seeded: #{redemption.id} #{reward.title} (balance: #{running_balance})"
+end
+
+cancelled_redemptions_seed = [
+  { reward_title: "Lounge Access Day Pass", idempotency_key: "seed-redeem-cancelled-001" },
+  { reward_title: "VIP Event Seating", idempotency_key: "seed-redeem-cancelled-002" }
+]
+
+cancelled_redemptions_seed.each do |attrs|
+  reward = Reward.find_by!(title: attrs[:reward_title])
+  redemption_key = "seed-user-redemption-#{attrs[:idempotency_key]}"
+
+  redemption = User::Redemption.find_or_initialize_by(user: user, idempotency_key: redemption_key)
+  redemption.update!(
+    reward: reward,
+    points_cost_snapshot: reward.points_cost,
+    status: "cancelled"
+  )
+
+  puts "Redemption seeded: #{redemption.id} #{reward.title} (cancelled, no points deducted)"
 end
 
 puts "Final seeded points balance: #{running_balance}"

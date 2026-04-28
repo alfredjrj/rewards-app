@@ -106,6 +106,48 @@ describe("RedemptionsPage", () => {
     expect(await screen.findByText("No redemptions yet.")).toBeInTheDocument();
   });
 
+  it("renders status badges with status-specific colors", async () => {
+    getUserRedemptionsMock.mockResolvedValue({
+      data: [
+        {
+          id: 1,
+          reward_id: 11,
+          reward_title: "Free Coffee",
+          points_cost_snapshot: 100,
+          status: "completed",
+          created_at: "2026-04-26T19:00:00Z",
+        },
+        {
+          id: 2,
+          reward_id: 22,
+          reward_title: "VIP Pass",
+          points_cost_snapshot: 300,
+          status: "failed",
+          created_at: "2026-04-26T20:00:00Z",
+        },
+        {
+          id: 3,
+          reward_id: 33,
+          reward_title: "Secret Box",
+          points_cost_snapshot: 500,
+          status: "cancelled",
+          created_at: "2026-04-26T21:00:00Z",
+        },
+      ],
+      meta: { page: 1, per_page: 10, total_count: 3, total_pages: 1 },
+    });
+
+    renderWithQueryClient(<RedemptionsPage />);
+
+    const completedBadge = await screen.findByText("completed");
+    const failedBadge = await screen.findByText("failed");
+    const cancelledBadge = await screen.findByText("cancelled");
+
+    expect(completedBadge.className).toContain("bg-green-100");
+    expect(failedBadge.className).toContain("bg-rose-100");
+    expect(cancelledBadge.className).toContain("bg-zinc-200");
+  });
+
   it("shows backend error message when history fetch fails", async () => {
     getUserRedemptionsMock.mockRejectedValue(new Error("Request failed"));
 

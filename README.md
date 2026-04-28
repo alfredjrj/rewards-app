@@ -21,11 +21,14 @@ A full-stack rewards redemption application with a Rails API backend and Next.js
 
 ## Setup & Running
 
-### Terminal 0 — Redis (durable mode)
+### Terminal 0 — Redis 
+
+Redis powers Sidekiq, Action Cable, and asynchronous redemption holds. From the repo root:
 
 ```bash
 redis-server backend/config/redis.conf
 ```
+
 
 ### Terminal 1 — Backend
 
@@ -38,10 +41,14 @@ rails s -p 3001
 
 ### Terminal 2 — Sidekiq worker
 
+Async redemptions enqueue jobs here; keep this running alongside Redis.
+
 ```bash
 cd backend
 bundle exec sidekiq
 ```
+
+While the Rails server is running, signed-in **admin** users can open **`http://localhost:3001/sidekiq`** for Sidekiq Web
 
 ### Terminal 3 — Frontend
 
@@ -67,9 +74,10 @@ NEXT_PUBLIC_API_URL=http://localhost:3001
 
 Example values are documented only in `.env.example` — application code reads `NEXT_PUBLIC_API_URL` at runtime (never hardcoded).
 
-### Backend (`backend/.env` or shell env)
+### Backend (`backend/.env`)
 
 Copy **`backend/.env.example`** as needed. Typical settings:
+Typical overrides:
 
 ```
 REDIS_URL=redis://localhost:6379/7
@@ -78,39 +86,22 @@ FRONTEND_ORIGINS=http://localhost:3000
 
 `FRONTEND_ORIGINS` is a comma-separated allowlist for Rack::CORS (cookie requests from the Next.js app).
 
-Use a dedicated DB index (like `/7`) per app to avoid seeing Sidekiq data
-from other projects in `/sidekiq`.
+Use a dedicated **Redis DB index** in `REDIS_URL` (for example `/7`) so Sidekiq and this app’s keys stay separate from other projects on `localhost:6379`.
 
-For high durability in local Redis, start it with:
-
-```bash
-redis-server backend/config/redis.conf
-```
+Use the same Redis startup command as **Terminal 0 — Redis (durable mode)** (above) when using `backend/config/redis.conf`.
 
 ---
 
 ## Seed Credentials
 
-After `rails db:setup`, a demo user is created and catalog of rewards
+After `rails db:setup`, a demo user is created along with the rewards catalog.
 
 | Field    | Value              |
 |----------|--------------------|
 | Email    | demo@example.com   |
 | Password | password123        |
 
----
-
-## Authentication Flow
-
-1. User submits email + password on `/login` or `/signup`
-2. Frontend POSTs to Rails Devise endpoint with `credentials: "include"`
-3. Rails validates credentials, signs in the user, sets an encrypted session cookie
-4. All subsequent API calls send the cookie automatically
-5. The `/api/me` endpoint is called on app load to restore session state
-6. Unauthenticated requests to protected endpoints return `401 Unauthorized`
-7. Sign-out DELETEs the session server-side and clears the cookie
-
-No tokens are stored in `localStorage`. Auth state lives entirely in the server-side session cookie.
+This account has **`admin: true`** (needed for **`/sidekiq`** — see Terminal 2 above).
 
 ---
 
@@ -131,13 +122,30 @@ No tokens are stored in `localStorage`. Auth state lives entirely in the server-
 
 ---
 
+## Out of Scope (Current Iteration)
+
+### Ledger Reconciliation Service
+
+This project uses an append-only `User::PointTransaction` ledger with idempotency and user-level locking to keep balance updates consistent in normal application flow.
+
+A separate background **reconciliation service** (periodically recomputing balances from ledger history and auto-repairing drift) is intentionally **out of scope** for this iteration.
+
+Why it is out of scope:
+
+- Core redemption correctness is already enforced by the current write path.
+- Reconciliation adds operational complexity (scheduling, alerting, repair policy, backfill safety).
+- For this take-home/interview scope, priority is end-to-end product behavior (async redemption, pending points visibility, idempotent writes) over long-horizon data-ops tooling.
+
+In a production-hardening phase, adding a read-only drift detector (and later controlled repair tooling) would be a recommended next step.
+
+---
+
 ## Non-Functional Requirements
 
 - **Scale**: capacity planning and throughput estimates below assume up to **15 million** daily active users (DAU).
-- **Security**: session-based authentication via secure cookies; protected endpoints return `401` for unauthenticated access and `403` for unauthorized actions.
 - **Performance**: reward list queries should remain responsive; title search must use an index-backed query strategy.
 - **Reliability**: database constraints enforce key invariants (for example non-negative points and non-blank required fields).
-- **Scalability**: API responses for reward catalogs use pagination to avoid unbounded payloads.
+- **Scalability**: catalog and history endpoints use pagination to bound payload size; redemption writes are offloaded to Sidekiq workers so web requests stay responsive under burst traffic.
 - **Maintainability**: policy-based authorization and clear controller layering (`ApplicationController` -> `AuthenticationController`) keep business logic consistent.
 - **Testability**: backend behavior is verified with RSpec request/policy specs and frontend behavior with Vitest/RTL tests.
 
@@ -148,7 +156,7 @@ No tokens are stored in `localStorage`. Auth state lives entirely in the server-
 ### CAP trade-offs by feature
 
 - **Reward redemption (CP-leaning)**: redemption correctness is critical (no double-spend, no negative points), so this flow should prefer **Consistency** over Availability during partitions. If data stores are partitioned or replicas are stale, rejecting/deferring redemption is safer than accepting an inconsistent write.
-- **Reward catalog browsing (AP-leaning)**: listing/searching rewards can tolerate slightly stale reads, so this flow can prioritize **Availability** and low latency. A briefly stale reward list is acceptable if redemption still validates availability at write time.
+- **Reward catalog browsing (consistency-first with low-latency goals)**: reward list reads should be fast, but correctness matters for user trust (for example, not showing obviously unavailable items). In this implementation, reads come from the primary transactional store and prioritize fresh-enough data over AP-style stale-tolerant replicas.
 - **Redemption history reads (AP with bounded staleness)**: users can usually tolerate minor read lag (for example, a recently redeemed item appearing moments later), as long as the underlying write path remains strongly consistent.
 
 ### Throughput estimate (15M DAU top-down model)
