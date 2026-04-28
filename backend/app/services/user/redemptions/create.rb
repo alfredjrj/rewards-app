@@ -1,5 +1,6 @@
 module User::Redemptions
   class Create
+    TERMINAL_STATUSES = %w[completed failed cancelled].freeze
     Result = Struct.new(:success?, :redemption, :points_balance, :error, keyword_init: true)
 
     def self.call(...)
@@ -14,10 +15,23 @@ module User::Redemptions
 
     def call
       existing = user.redemptions.find_by(idempotency_key: idempotency_key)
-      return success(existing, current_points_balance) if existing&.status == "completed"
+      if existing && TERMINAL_STATUSES.include?(existing.status)
+        return success(existing, current_points_balance) if existing.status == "completed"
+
+        return failure("redemption_finalized", "Redemption already finalized")
+      end
       return failure("reward_unavailable", "Reward is not available for redemption") unless reward.is_available?
 
+      points_result = nil
+      redemption = existing || User::Redemption.new(user: user, idempotency_key: idempotency_key)
+
       ActiveRecord::Base.transaction do
+        redemption.assign_attributes(
+          reward: reward,
+          points_cost_snapshot: reward.points_cost
+        )
+        redemption.save! if redemption.new_record?
+
         points_result = User::PointTransactions::Create.call(
           user: user,
           amount: -reward.points_cost,
@@ -25,20 +39,21 @@ module User::Redemptions
           reason_code: "reward_redemption",
           idempotency_key: idempotency_key,
           reason: "Redeemed reward #{reward.id}",
-          source: reward
+          source: redemption
         )
 
-        return failure_from_points_result(points_result) unless points_result.success?
+        raise ActiveRecord::Rollback unless points_result.success?
 
-        redemption = existing || User::Redemption.new(user: user, idempotency_key: idempotency_key)
         redemption.update!(
           reward: reward,
           points_cost_snapshot: reward.points_cost,
           status: "completed"
         )
-
-        success(redemption, points_result.transaction.running_balance)
       end
+
+      return failure_from_points_result(points_result) unless points_result.success?
+
+      success(redemption, points_result.transaction.running_balance)
     rescue ActiveRecord::RecordInvalid => e
       Rails.logger.warn(e.full_message)
       failure(

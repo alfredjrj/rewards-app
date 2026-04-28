@@ -169,6 +169,23 @@ RSpec.describe "Api::V1::User::RedemptionsController", type: :request do
         expect(User::Redemptions::ProcessJob).not_to have_received(:perform_in)
       end
 
+      it "returns bad_request when idempotency key format is invalid" do
+        allow(User::Redemptions::ProcessJob).to receive(:perform_in)
+
+        post "/api/v1/user/redemptions",
+             params: { redemption: { reward_id: reward.id } },
+             headers: { "Idempotency-Key" => "bad key with spaces" }
+
+        expect(response).to have_http_status(:bad_request)
+        expect(JSON.parse(response.body)).to eq(
+          "error" => {
+            "code" => "invalid_idempotency_key",
+            "message" => "Idempotency-Key must be 1-128 chars of letters, numbers, underscore, or dash"
+          }
+        )
+        expect(User::Redemptions::ProcessJob).not_to have_received(:perform_in)
+      end
+
       it "returns existing status for duplicate idempotency key without enqueueing" do
         key = "406625f1-81c1-43e4-9e74-377e4c6ff31c"
         create(:user_redemption, user: user, reward: reward, idempotency_key: key, status: "completed")
@@ -179,7 +196,25 @@ RSpec.describe "Api::V1::User::RedemptionsController", type: :request do
              headers: { "Idempotency-Key" => key }
 
         expect(User::Redemptions::ProcessJob).not_to have_received(:perform_in)
-        expect(response).to have_http_status(:accepted)
+        expect(response).to have_http_status(:ok)
+        expect(JSON.parse(response.body)).to include(
+          "data" => hash_including("request_id" => key, "status" => "completed")
+        )
+      end
+
+      it "returns existing completed replay even if reward became unavailable" do
+        key = "b4be53af-2867-4638-9aa6-4dbf3dd6482c"
+        reward.update!(is_available: true)
+        create(:user_redemption, user: user, reward: reward, idempotency_key: key, status: "completed")
+        reward.update!(is_available: false)
+        allow(User::Redemptions::ProcessJob).to receive(:perform_in)
+
+        post "/api/v1/user/redemptions",
+             params: { redemption: { reward_id: reward.id } },
+             headers: { "Idempotency-Key" => key }
+
+        expect(response).to have_http_status(:ok)
+        expect(User::Redemptions::ProcessJob).not_to have_received(:perform_in)
         expect(JSON.parse(response.body)).to include(
           "data" => hash_including("request_id" => key, "status" => "completed")
         )
@@ -260,13 +295,35 @@ RSpec.describe "Api::V1::User::RedemptionsController", type: :request do
       end
 
       it "returns processing when request is still pending" do
+        processing = create(
+          :user_redemption,
+          user: user,
+          reward: create(:reward),
+          status: "processing",
+          idempotency_key: "pending-123"
+        )
         get "/api/v1/user/redemptions/pending-123"
 
         expect(response).to have_http_status(:ok)
-        expect(JSON.parse(response.body)).to eq(
+        expect(JSON.parse(response.body)).to include(
           "data" => {
             "request_id" => "pending-123",
+            "id" => processing.id,
+            "reward_id" => processing.reward_id,
+            "points_cost_snapshot" => processing.points_cost_snapshot,
             "status" => "processing"
+          }
+        )
+      end
+
+      it "returns not_found when request id is unknown to cache and db" do
+        get "/api/v1/user/redemptions/not-real-123"
+
+        expect(response).to have_http_status(:not_found)
+        expect(JSON.parse(response.body)).to eq(
+          "error" => {
+            "code" => "not_found",
+            "message" => "No redemption found for request id"
           }
         )
       end

@@ -44,5 +44,38 @@ RSpec.describe User::Redemptions::EnqueueProcessing do
       expect(User::Redemptions::ProcessJob).not_to have_received(:perform_in)
       expect(user.redemptions.find_by(idempotency_key: idempotency_key)).to be_nil
     end
+
+    it "short-circuits when redemption already exists for idempotency key" do
+      existing = create(
+        :user_redemption,
+        user: user,
+        reward: reward,
+        status: "processing",
+        idempotency_key: idempotency_key
+      )
+      allow(User::Redemptions::ProcessJob).to receive(:perform_in)
+
+      result = described_class.call(user: user, reward: reward, idempotency_key: idempotency_key)
+
+      expect(result.success?).to be(true)
+      expect(result.redemption).to eq(existing)
+      expect(User::Redemptions::ProcessJob).not_to have_received(:perform_in)
+      expect(user.redemptions.where(idempotency_key: idempotency_key).count).to eq(1)
+    end
+
+    it "returns enqueue_unavailable and marks row failed when enqueue fails" do
+      allow(User::Redemptions::ProcessJob).to receive(:perform_in).and_raise(StandardError, "redis down")
+
+      result = described_class.call(user: user, reward: reward, idempotency_key: idempotency_key)
+
+      expect(result.success?).to be(false)
+      expect(result.error).to eq(
+        code: "enqueue_unavailable",
+        message: "Redemption queue is temporarily unavailable. Please try again."
+      )
+      redemption = user.redemptions.find_by(idempotency_key: idempotency_key)
+      expect(redemption).to be_present
+      expect(redemption.status).to eq("failed")
+    end
   end
 end

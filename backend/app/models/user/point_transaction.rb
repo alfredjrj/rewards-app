@@ -1,6 +1,7 @@
 class User::PointTransaction < ApplicationRecord
   self.table_name = "user_point_transactions"
 
+  ALLOWED_SOURCE_TYPES = %w[Reward User::Redemption].freeze
   KINDS = %w[earn redeem adjustment expiry reversal].freeze
   REASON_CODES = %w[
     purchase
@@ -20,5 +21,6 @@ class User::PointTransaction < ApplicationRecord
   validates :running_balance, numericality: { only_integer: true, greater_than_or_equal_to: 0 }
   validates :kind, inclusion: { in: KINDS }
   validates :reason_code, inclusion: { in: REASON_CODES }
+  validates :source_type, inclusion: { in: ALLOWED_SOURCE_TYPES }, allow_nil: true
   validates :idempotency_key, presence: true, uniqueness: { scope: :user_id }
 end

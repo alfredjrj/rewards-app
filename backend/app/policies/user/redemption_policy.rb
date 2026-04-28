@@ -11,6 +11,13 @@ class User::RedemptionPolicy < ApplicationPolicy
     user.present?
   end
 
+  def show?
+    return false unless user.present?
+    return true unless record.is_a?(User::Redemption)
+
+    record.user_id == user.id
+  end
+
   def create?
     return false unless user.present?
     return false unless record.user_id == user.id

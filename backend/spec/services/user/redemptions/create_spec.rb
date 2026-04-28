@@ -25,7 +25,9 @@ RSpec.describe User::Redemptions::Create do
       expect(result.redemption).to be_persisted
       expect(result.redemption.reward).to eq(reward)
       expect(result.points_balance).to eq(380)
-      expect(user.point_transactions.order(:id).last.amount).to eq(-120)
+      debit = user.point_transactions.order(:id).last
+      expect(debit.amount).to eq(-120)
+      expect(debit.source).to eq(result.redemption)
     end
 
     it "returns idempotent hit for duplicate key" do
@@ -86,7 +88,53 @@ RSpec.describe User::Redemptions::Create do
       expect(result.success?).to be(true)
       expect(result.redemption.id).to eq(processing.id)
       expect(result.redemption.status).to eq("completed")
-      expect(user.point_transactions.order(:id).last.amount).to eq(-120)
+      debit = user.point_transactions.order(:id).last
+      expect(debit.amount).to eq(-120)
+      expect(debit.source).to eq(processing)
+    end
+
+    it "does not resurrect a failed redemption on replay with same idempotency key" do
+      failed_redemption = create(
+        :user_redemption,
+        user: user,
+        reward: reward,
+        points_cost_snapshot: reward.points_cost,
+        status: "failed",
+        idempotency_key: idempotency_key
+      )
+
+      result = described_class.call(user: user, reward: reward, idempotency_key: idempotency_key)
+
+      expect(result.success?).to be(false)
+      expect(result.error).to eq(
+        code: "redemption_finalized",
+        message: "Redemption already finalized"
+      )
+      expect(result.redemption).to be_nil
+      expect(user.point_transactions.count).to eq(1)
+      expect(failed_redemption.reload.status).to eq("failed")
+    end
+
+    it "does not resurrect a cancelled redemption on replay with same idempotency key" do
+      cancelled_redemption = create(
+        :user_redemption,
+        user: user,
+        reward: reward,
+        points_cost_snapshot: reward.points_cost,
+        status: "cancelled",
+        idempotency_key: idempotency_key
+      )
+
+      result = described_class.call(user: user, reward: reward, idempotency_key: idempotency_key)
+
+      expect(result.success?).to be(false)
+      expect(result.error).to eq(
+        code: "redemption_finalized",
+        message: "Redemption already finalized"
+      )
+      expect(result.redemption).to be_nil
+      expect(user.point_transactions.count).to eq(1)
+      expect(cancelled_redemption.reload.status).to eq("cancelled")
     end
 
     it "re-raises unexpected exceptions so retries/error monitoring can capture them" do

@@ -6,7 +6,7 @@ class Api::V1::User::RedemptionsController < AuthenticationController
   def index
     authorize User::Redemption, :index?
 
-    scope = policy_scope(User::Redemption, policy_scope_class: User::RedemptionPolicy::Scope)
+    scope = policy_scope(User::Redemption)
               .includes(:reward)
               .order(created_at: :desc, id: :desc)
     scope = RedemptionHistoryQuery.new(scope, params).call
@@ -35,19 +35,23 @@ class Api::V1::User::RedemptionsController < AuthenticationController
       idempotency_key: @idempotency_key
     )
     unless enqueue_result.success?
-      render json: { error: enqueue_result.error }, status: :unprocessable_entity
+      error_status = enqueue_result.error&.dig(:code) == "enqueue_unavailable" ? :service_unavailable : :unprocessable_entity
+      render json: { error: enqueue_result.error }, status: error_status
       return
     end
 
+    result_status = enqueue_result.redemption&.status || "processing"
+    http_status = result_status == "processing" ? :accepted : :ok
+
     render json: ::Api::V1::User::RedemptionSerializer::Status.call(
       request_id: @idempotency_key,
-      reward_id: @reward.id,
-      status: "processing"
-    ), status: :accepted
+      reward_id: enqueue_result.redemption&.reward_id || @reward.id,
+      status: result_status
+    ), status: http_status
   end
 
   def show
-    authorize User::Redemption, :index?
+    authorize User::Redemption, :show?
 
     request_id = params[:id].to_s
 
@@ -69,6 +73,7 @@ class Api::V1::User::RedemptionsController < AuthenticationController
 
     redemption = current_user.redemptions.find_by(idempotency_key: request_id)
     if redemption
+      authorize redemption, :show?
       render json: ::Api::V1::User::RedemptionSerializer::Status.call(
         request_id: request_id,
         status: redemption.status,
@@ -77,10 +82,12 @@ class Api::V1::User::RedemptionsController < AuthenticationController
       return
     end
 
-    render json: ::Api::V1::User::RedemptionSerializer::Status.call(
-      request_id: request_id,
-      status: "processing"
-    )
+    render json: {
+      error: {
+        code: "not_found",
+        message: "No redemption found for request id"
+      }
+    }, status: :not_found
   end
 
   private
@@ -97,27 +104,28 @@ class Api::V1::User::RedemptionsController < AuthenticationController
   end
 
   def set_create_idempotency_key
-    @idempotency_key = request.headers["Idempotency-Key"].presence
-    return if @idempotency_key
+    result = User::Redemptions::IdempotencyKey.call(
+      raw_header_value: request.headers["Idempotency-Key"]
+    )
+    if result.valid?
+      @idempotency_key = result.key
+      return
+    end
 
     skip_authorization
-    render json: {
-      error: {
-        code: "idempotency_key_required",
-        message: "Idempotency-Key header is required"
-      }
-    }, status: :bad_request
+    render json: { error: result.error }, status: :bad_request
   end
 
   def load_and_render_existing_redemption
     @existing_redemption = existing_redemption_for(@idempotency_key)
     return unless @existing_redemption
 
-    authorize @existing_redemption
+    authorize @existing_redemption, :show?
+    http_status = @existing_redemption.status == "processing" ? :accepted : :ok
     render json: ::Api::V1::User::RedemptionSerializer::Status.call(
       request_id: @idempotency_key,
       status: @existing_redemption.status,
       redemption: @existing_redemption
-    ), status: :accepted
+    ), status: http_status
   end
 end

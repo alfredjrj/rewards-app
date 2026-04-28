@@ -52,5 +52,28 @@ RSpec.describe User::PointTransaction, type: :model do
       expect(duplicate).not_to be_valid
       expect(duplicate.errors[:idempotency_key]).to include("has already been taken")
     end
+
+    it "allows Reward as a source type" do
+      reward = create(:reward)
+      transaction = build(:user_point_transaction, source: reward)
+
+      expect(transaction).to be_valid
+    end
+
+    it "allows User::Redemption as a source type" do
+      redemption = create(:user_redemption)
+      transaction = build(:user_point_transaction, source: redemption)
+
+      expect(transaction).to be_valid
+    end
+
+    it "rejects unsupported source types" do
+      transaction = build(:user_point_transaction)
+      transaction.source_type = "User"
+      transaction.source_id = 1
+
+      expect(transaction).not_to be_valid
+      expect(transaction.errors[:source_type]).to include("is not included in the list")
+    end
   end
 end
