@@ -38,11 +38,11 @@ RSpec.describe User, type: :model do
       expect(user.errors[:email]).to include("has already been taken")
     end
 
-    it "requires password to be at least 6 characters" do
-      user = build(:user, password: "12345", password_confirmation: "12345")
+    it "requires password to be at least 8 characters" do
+      user = build(:user, password: "1234567", password_confirmation: "1234567")
 
       expect(user).not_to be_valid
-      expect(user.errors[:password]).to include("is too short (minimum is 6 characters)")
+      expect(user.errors[:password]).to include("is too short (minimum is 8 characters)")
     end
   end
 end

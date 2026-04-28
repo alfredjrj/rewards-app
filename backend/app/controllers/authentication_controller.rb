@@ -4,6 +4,8 @@ class AuthenticationController < ApplicationController
   before_action :authenticate_user!
   after_action :verify_pundit_authorization!, unless: :devise_controller?
   rescue_from Pundit::NotAuthorizedError, with: :user_not_authorized
+  rescue_from ActiveRecord::RecordNotFound, with: :record_not_found
+  rescue_from ActionController::ParameterMissing, with: :parameter_missing
 
   private
 
@@ -18,7 +20,30 @@ class AuthenticationController < ApplicationController
   end
 
   def user_not_authorized
-    render json: { error: "Not authorized" }, status: :forbidden
+    render json: {
+      error: {
+        code: "forbidden",
+        message: "Not authorized"
+      }
+    }, status: :forbidden
+  end
+
+  def record_not_found
+    render json: {
+      error: {
+        code: "not_found",
+        message: "Resource not found"
+      }
+    }, status: :not_found
+  end
+
+  def parameter_missing(exception)
+    render json: {
+      error: {
+        code: "parameter_missing",
+        message: exception.message
+      }
+    }, status: :bad_request
   end
 
   def verify_pundit_authorization!

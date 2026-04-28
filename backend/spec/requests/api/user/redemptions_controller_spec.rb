@@ -231,10 +231,49 @@ RSpec.describe "Api::V1::User::RedemptionsController", type: :request do
 
         expect(response).to have_http_status(:forbidden)
         expect(JSON.parse(response.body)).to eq(
-          "error" => "Not authorized"
+          "error" => {
+            "code" => "forbidden",
+            "message" => "Not authorized"
+          }
         )
         expect(User::Redemptions::ProcessJob).not_to have_received(:perform_in)
         expect(user.redemptions.find_by(idempotency_key: key)).to be_nil
+      end
+
+      it "returns not_found when reward does not exist" do
+        key = "3e32f8d6-cfbe-49e2-b030-1547559e3515"
+        allow(User::Redemptions::ProcessJob).to receive(:perform_in)
+
+        post "/api/v1/user/redemptions",
+             params: { redemption: { reward_id: 99_999_999 } },
+             headers: { "Idempotency-Key" => key }
+
+        expect(response).to have_http_status(:not_found)
+        expect(JSON.parse(response.body)).to eq(
+          "error" => {
+            "code" => "not_found",
+            "message" => "Resource not found"
+          }
+        )
+        expect(User::Redemptions::ProcessJob).not_to have_received(:perform_in)
+      end
+
+      it "returns bad_request when redemption param is missing" do
+        key = "2f89f8cb-84d1-4d74-961a-fa4c2cccb5f9"
+        allow(User::Redemptions::ProcessJob).to receive(:perform_in)
+
+        post "/api/v1/user/redemptions",
+             params: {},
+             headers: { "Idempotency-Key" => key }
+
+        expect(response).to have_http_status(:bad_request)
+        expect(JSON.parse(response.body)).to eq(
+          "error" => {
+            "code" => "parameter_missing",
+            "message" => "param is missing or the value is empty or invalid: redemption"
+          }
+        )
+        expect(User::Redemptions::ProcessJob).not_to have_received(:perform_in)
       end
 
       it "returns unprocessable_entity when points_available is less than reward cost" do
