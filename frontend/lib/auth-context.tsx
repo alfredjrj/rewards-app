@@ -31,7 +31,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refreshUser = useCallback(async () => {
     const [profile, points] = await Promise.all([getCurrentUser(), getUserPoints()]);
-    setUser({ ...profile, points_balance: points.points_balance });
+    setUser({
+      ...profile,
+      points_balance: points.points_balance,
+      points_pending_redemption: points.points_pending_redemption,
+      points_available: points.points_available,
+    });
   }, []);
 
   useEffect(() => {

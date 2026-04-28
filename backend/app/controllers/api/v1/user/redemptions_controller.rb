@@ -28,7 +28,21 @@ class Api::V1::User::RedemptionsController < AuthenticationController
     authorize :redemption, :create?
 
     idempotency_key = request.headers["Idempotency-Key"].presence || SecureRandom.uuid
-    User::Redemptions::ProcessJob.perform_async(current_user.id, reward.id, idempotency_key)
+    # Mirror Sidekiq intent in Redis so GET /points can subtract pending before the ledger debit
+    # runs (see User::Redemptions::PendingPoints).
+    did_reserve = User::Redemptions::PendingPoints.reserve!(
+      user_id: current_user.id,
+      request_id: idempotency_key,
+      points: reward.points_cost
+    )
+    begin
+      # Demo / interview only: enqueue processing 1s later so pending points (Redis) stay visible
+      # before the job runs—not how you’d ship production latency; use perform_async instead.
+      User::Redemptions::ProcessJob.perform_in(2.second, current_user.id, reward.id, idempotency_key)
+    rescue StandardError
+      User::Redemptions::PendingPoints.release!(user_id: current_user.id, request_id: idempotency_key) if did_reserve
+      raise
+    end
 
     render json: ::Api::V1::User::RedemptionSerializer::Status.call(
       request_id: idempotency_key,

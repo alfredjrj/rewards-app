@@ -59,17 +59,24 @@ Then open **http://localhost:3000**
 
 ### Frontend (`frontend/.env.local`)
 
+Copy **`frontend/.env.example`** and set:
+
 ```
 NEXT_PUBLIC_API_URL=http://localhost:3001
 ```
 
-This file is included with the safe development default.
+Example values are documented only in `.env.example` — application code reads `NEXT_PUBLIC_API_URL` at runtime (never hardcoded).
 
 ### Backend (`backend/.env` or shell env)
 
+Copy **`backend/.env.example`** as needed. Typical settings:
+
 ```
 REDIS_URL=redis://localhost:6379/7
+FRONTEND_ORIGINS=http://localhost:3000
 ```
+
+`FRONTEND_ORIGINS` is a comma-separated allowlist for Rack::CORS (cookie requests from the Next.js app).
 
 Use a dedicated DB index (like `/7`) per app to avoid seeing Sidekiq data
 from other projects in `/sidekiq`.

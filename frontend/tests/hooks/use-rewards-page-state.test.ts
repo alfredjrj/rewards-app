@@ -65,7 +65,7 @@ describe("useRewardsPageState", () => {
     vi.clearAllMocks();
     fetchRewardsMock.mockResolvedValue({
       data: [reward],
-      meta: { page: 1, per_page: 6, total_count: 1, total_pages: 1 },
+      meta: { page: 1, per_page: 10, total_count: 1, total_pages: 1 },
     });
     redeemRewardMock.mockResolvedValue({
       data: {
@@ -79,9 +79,17 @@ describe("useRewardsPageState", () => {
       reward_id: 1,
       status: "completed",
     });
-    getUserPointsMock.mockResolvedValue({
-      points_balance: 590,
-    });
+    getUserPointsMock
+      .mockResolvedValueOnce({
+        points_balance: 690,
+        points_pending_redemption: 100,
+        points_available: 590,
+      })
+      .mockResolvedValueOnce({
+        points_balance: 590,
+        points_pending_redemption: 0,
+        points_available: 590,
+      });
   });
 
   afterEach(() => {
@@ -121,7 +129,7 @@ describe("useRewardsPageState", () => {
     expect(fetchRewardsMock).toHaveBeenCalledWith({
       query: "",
       page: 1,
-      perPage: 6,
+      perPage: 10,
       rewardTypes: [],
       affordableOnly: false,
       maxPoints: 690,
@@ -146,7 +154,7 @@ describe("useRewardsPageState", () => {
       expect(fetchRewardsMock).toHaveBeenCalledWith({
         query: "",
         page: 1,
-        perPage: 6,
+        perPage: 10,
         rewardTypes: [],
         affordableOnly: false,
         maxPoints: 690,
@@ -204,10 +212,19 @@ describe("useRewardsPageState", () => {
       pointsSpent: 100,
       pointsBalance: 590,
     });
-    expect(setUserMock).toHaveBeenCalledWith({
+    expect(setUserMock).toHaveBeenNthCalledWith(1, {
+      id: 1,
+      email: "demo@example.com",
+      points_balance: 690,
+      points_pending_redemption: 100,
+      points_available: 590,
+    });
+    expect(setUserMock).toHaveBeenLastCalledWith({
       id: 1,
       email: "demo@example.com",
       points_balance: 590,
+      points_pending_redemption: 0,
+      points_available: 590,
     });
     expect(result.current.pendingReward).toBeNull();
   });

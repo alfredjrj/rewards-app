@@ -30,7 +30,11 @@ describe("AuthProvider", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     getCurrentUserMock.mockResolvedValue({ id: 1, email: "demo@example.com" });
-    getUserPointsMock.mockResolvedValue({ points_balance: 810 });
+    getUserPointsMock.mockResolvedValue({
+      points_balance: 810,
+      points_pending_redemption: 0,
+      points_available: 810,
+    });
   });
 
   it("merges points_balance from getUserPoints on initial load", async () => {
@@ -49,9 +53,17 @@ describe("AuthProvider", () => {
 
   it("refreshUser reloads profile and points (e.g. after login redirects here)", async () => {
     const user = userEvent.setup();
-    getUserPointsMock.mockResolvedValueOnce({ points_balance: 810 }).mockResolvedValueOnce({
-      points_balance: 500,
-    });
+    getUserPointsMock
+      .mockResolvedValueOnce({
+        points_balance: 810,
+        points_pending_redemption: 0,
+        points_available: 810,
+      })
+      .mockResolvedValueOnce({
+        points_balance: 500,
+        points_pending_redemption: 0,
+        points_available: 500,
+      });
 
     render(
       <AuthProvider>

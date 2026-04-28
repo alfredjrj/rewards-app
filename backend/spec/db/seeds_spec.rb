@@ -15,7 +15,7 @@ RSpec.describe "db/seeds.rb" do
 
     expect(user).to be_present
     expect(user.admin).to be(true)
-    expect(Reward.count).to eq(25)
+    expect(Reward.count).to eq(35)
     expect(redemptions.count).to eq(11)
     expect(point_transactions.count).to eq(15)
     expect(redeem_transactions.count).to eq(11)
@@ -41,7 +41,7 @@ RSpec.describe "db/seeds.rb" do
     point_transactions = User::PointTransaction.where(user: user)
     redemptions = User::Redemption.where(user: user)
 
-    expect(Reward.count).to eq(25)
+    expect(Reward.count).to eq(35)
     expect(point_transactions.count).to eq(15)
     expect(redemptions.count).to eq(11)
   end

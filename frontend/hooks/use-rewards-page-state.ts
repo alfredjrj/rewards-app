@@ -20,7 +20,7 @@ type UseRewardsPageStateArgs = {
   setUser: (user: User | null) => void;
 };
 
-const PER_PAGE = 6;
+const PER_PAGE = 10;
 const SEARCH_DEBOUNCE_MS = 500;
 
 export function useRewardsPageState({ user, authLoading, setUser }: UseRewardsPageStateArgs) {
@@ -48,17 +48,18 @@ export function useRewardsPageState({ user, authLoading, setUser }: UseRewardsPa
         perPage: PER_PAGE,
         rewardTypes: selectedRewardTypes,
         affordableOnly,
-        maxPoints: user?.points_balance ?? 0,
+        maxPoints: user?.points_available ?? user?.points_balance ?? 0,
       },
     ],
     queryFn: () => {
+      const spendable = user?.points_available ?? user?.points_balance ?? 0;
       return fetchRewards({
         query: debouncedQuery,
         page,
         perPage: PER_PAGE,
         rewardTypes: selectedRewardTypes,
         affordableOnly,
-        maxPoints: user?.points_balance ?? 0,
+        maxPoints: spendable,
       });
     },
     enabled: !authLoading && Boolean(user),
@@ -107,6 +108,17 @@ export function useRewardsPageState({ user, authLoading, setUser }: UseRewardsPa
       if (payload.data.status === "processing" && payload.data.request_id) {
         setProcessingRequestId(payload.data.request_id);
         setProcessingReward(reward);
+        try {
+          const latestPoints = await getUserPoints();
+          setUser({
+            ...currentUser,
+            points_balance: latestPoints.points_balance,
+            points_pending_redemption: latestPoints.points_pending_redemption,
+            points_available: latestPoints.points_available,
+          });
+        } catch {
+          // Header can refresh on next navigation; redemption flow still tracks completion.
+        }
       } else {
         if (typeof payload.data.points_balance === "number") {
           setUser({ ...currentUser, points_balance: payload.data.points_balance });
@@ -176,7 +188,12 @@ export function useRewardsPageState({ user, authLoading, setUser }: UseRewardsPa
         try {
           const latestPoints = await getUserPoints();
           latestPointsBalance = latestPoints.points_balance;
-          setUser({ ...currentUser, points_balance: latestPointsBalance });
+          setUser({
+            ...currentUser,
+            points_balance: latestPoints.points_balance,
+            points_pending_redemption: latestPoints.points_pending_redemption,
+            points_available: latestPoints.points_available,
+          });
         } catch {
           // Keep completion UX even if points refresh fails transiently.
         }

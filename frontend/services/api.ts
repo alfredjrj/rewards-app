@@ -1,9 +1,13 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
+import { getPublicApiUrl } from "@/lib/public-api-url";
 
 export interface User {
   id: number;
   email: string;
   points_balance?: number;
+  /** Points reserved for in-flight async redemptions (server uses Redis; see API). */
+  points_pending_redemption?: number;
+  /** Ledger balance minus pending; spendable before jobs finish. */
+  points_available?: number;
 }
 
 export interface UserProfileResponse {
@@ -13,11 +17,15 @@ export interface UserProfileResponse {
 export interface UserPoints {
   data: {
     points_balance: number;
+    points_pending_redemption: number;
+    points_available: number;
   };
 }
 
 export interface UserPointsPayload {
   points_balance: number;
+  points_pending_redemption: number;
+  points_available: number;
 }
 
 export interface Reward {
@@ -148,7 +156,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   let res: Response;
   try {
-    res = await fetch(`${API_URL}${path}`, {
+    res = await fetch(`${getPublicApiUrl()}${path}`, {
       ...options,
       credentials: "include",
       signal: controller.signal,

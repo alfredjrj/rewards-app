@@ -128,13 +128,21 @@ RSpec.describe "Api::V1::User::RedemptionsController", type: :request do
 
       it "enqueues async redemption processing and returns processing state" do
         key = "406625f1-81c1-43e4-9e74-377e4c6ff31c"
-        allow(User::Redemptions::ProcessJob).to receive(:perform_async)
+        allow(User::Redemptions::ProcessJob).to receive(:perform_in)
+        allow(User::Redemptions::PendingPoints).to receive(:reserve!).and_return(true)
 
         post "/api/v1/user/redemptions",
              params: { redemption: { reward_id: reward.id } },
              headers: { "Idempotency-Key" => key }
 
-        expect(User::Redemptions::ProcessJob).to have_received(:perform_async).with(
+        expect(User::Redemptions::PendingPoints).to have_received(:reserve!).with(
+          user_id: user.id,
+          request_id: key,
+          points: reward.points_cost
+        )
+
+        expect(User::Redemptions::ProcessJob).to have_received(:perform_in).with(
+          1.second,
           user.id,
           reward.id,
           key

@@ -1,8 +1,11 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 
+/** Request URLs must follow this origin only — never hardcode hosts in expectations. */
+const TEST_API_ORIGIN = "http://api.test.fixture";
+
 describe("services/api", () => {
   beforeEach(() => {
-    process.env.NEXT_PUBLIC_API_URL = "http://localhost:3001";
+    process.env.NEXT_PUBLIC_API_URL = TEST_API_ORIGIN;
     vi.resetModules();
     vi.restoreAllMocks();
   });
@@ -24,7 +27,7 @@ describe("services/api", () => {
     await login("demo@example.com", "password123");
 
     expect(fetchMock).toHaveBeenCalledWith(
-      "http://localhost:3001/users/sign_in",
+      `${TEST_API_ORIGIN}/users/sign_in`,
       expect.objectContaining({
         method: "POST",
         credentials: "include",
@@ -73,7 +76,7 @@ describe("services/api", () => {
     await expect(getCurrentUser()).resolves.toEqual({ id: 1, email: "demo@example.com" });
 
     expect(fetchMock).toHaveBeenCalledWith(
-      "http://localhost:3001/api/v1/user",
+      `${TEST_API_ORIGIN}/api/v1/user`,
       expect.objectContaining({ credentials: "include" })
     );
   });
@@ -103,7 +106,7 @@ describe("services/api", () => {
     await expect(getUserPoints()).resolves.toEqual({ points_balance: 690 });
 
     expect(fetchMock).toHaveBeenCalledWith(
-      "http://localhost:3001/api/v1/user/points",
+      `${TEST_API_ORIGIN}/api/v1/user/points`,
       expect.objectContaining({ credentials: "include" })
     );
   });
@@ -123,12 +126,12 @@ describe("services/api", () => {
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
-      "http://localhost:3001/users",
+      `${TEST_API_ORIGIN}/users`,
       expect.objectContaining({ method: "POST" })
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
-      "http://localhost:3001/users/sign_out",
+      `${TEST_API_ORIGIN}/users/sign_out`,
       expect.objectContaining({ method: "DELETE" })
     );
   });
@@ -149,7 +152,7 @@ describe("services/api", () => {
     await redeemReward(2);
 
     expect(fetchMock).toHaveBeenCalledWith(
-      "http://localhost:3001/api/v1/user/redemptions",
+      `${TEST_API_ORIGIN}/api/v1/user/redemptions`,
       expect.objectContaining({
         method: "POST",
         body: JSON.stringify({ redemption: { reward_id: 2 } }),
@@ -195,7 +198,7 @@ describe("services/api", () => {
     await getUserRedemptions({ page: 1, perPage: 5 });
 
     expect(fetchMock).toHaveBeenCalledWith(
-      "http://localhost:3001/api/v1/user/redemptions?page=1&per_page=5",
+      `${TEST_API_ORIGIN}/api/v1/user/redemptions?page=1&per_page=5`,
       expect.objectContaining({ credentials: "include" })
     );
   });
@@ -221,7 +224,7 @@ describe("services/api", () => {
     });
 
     expect(fetchMock).toHaveBeenCalledWith(
-      "http://localhost:3001/api/v1/user/redemptions?page=1&per_page=5&filter%5Bstatus%5D=completed&filter%5Bpoints%5D%5Bgte%5D=100&filter%5Bpoints%5D%5Blte%5D=300&sort=-created_at",
+      `${TEST_API_ORIGIN}/api/v1/user/redemptions?page=1&per_page=5&filter%5Bstatus%5D=completed&filter%5Bpoints%5D%5Bgte%5D=100&filter%5Bpoints%5D%5Blte%5D=300&sort=-created_at`,
       expect.objectContaining({ credentials: "include" })
     );
   });
@@ -231,9 +234,9 @@ describe("services/api", () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       headers: { get: () => "application/json" },
-      json: async () => ({ data: [], meta: { page: 1, per_page: 6, total_count: 0, total_pages: 1 } }),
+      json: async () => ({ data: [], meta: { page: 1, per_page: 10, total_count: 0, total_pages: 1 } }),
       text: async () =>
-        JSON.stringify({ data: [], meta: { page: 1, per_page: 6, total_count: 0, total_pages: 1 } }),
+        JSON.stringify({ data: [], meta: { page: 1, per_page: 10, total_count: 0, total_pages: 1 } }),
     });
     vi.stubGlobal("fetch", fetchMock);
 
@@ -244,12 +247,12 @@ describe("services/api", () => {
       affordableOnly: true,
       maxPoints: 200,
       page: 2,
-      perPage: 6,
+      perPage: 10,
       sort: "-points_cost",
     });
 
     expect(fetchMock).toHaveBeenCalledWith(
-      "http://localhost:3001/api/v1/rewards?filter%5Bquery%5D=coffee&filter%5Breward_types%5D%5B%5D=free_item&filter%5Breward_types%5D%5B%5D=vip_experience&filter%5Bpoints%5D%5Bgte%5D=50&filter%5Bpoints%5D%5Blte%5D=200&page=2&per_page=6&sort=-points_cost",
+      `${TEST_API_ORIGIN}/api/v1/rewards?filter%5Bquery%5D=coffee&filter%5Breward_types%5D%5B%5D=free_item&filter%5Breward_types%5D%5B%5D=vip_experience&filter%5Bpoints%5D%5Bgte%5D=50&filter%5Bpoints%5D%5Blte%5D=200&page=2&per_page=10&sort=-points_cost`,
       expect.objectContaining({ credentials: "include" })
     );
   });

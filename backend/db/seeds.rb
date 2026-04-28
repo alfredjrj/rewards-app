@@ -182,6 +182,76 @@ rewards_data = [
     points_cost: 870,
     reward_type: "secret_menu",
     is_available: true
+  },
+  {
+    title: "Artisan Pastry Box",
+    description: "Seasonal pastries from local baker partners.",
+    points_cost: 340,
+    reward_type: "free_item",
+    is_available: true
+  },
+  {
+    title: "Sunset Harbor Cruise",
+    description: "Evening cruise with light refreshments.",
+    points_cost: 1850,
+    reward_type: "vip_experience",
+    is_available: true
+  },
+  {
+    title: "Midnight Cocoa Flight",
+    description: "Secret-menu tasting of single-origin cocoas.",
+    points_cost: 620,
+    reward_type: "secret_menu",
+    is_available: true
+  },
+  {
+    title: "Free Iced Tea Refill",
+    description: "Unlimited iced tea refills for one visit.",
+    points_cost: 95,
+    reward_type: "free_item",
+    is_available: true
+  },
+  {
+    title: "Yoga Workshop Weekend",
+    description: "Two-day beginner-friendly yoga intensive.",
+    points_cost: 1420,
+    reward_type: "vip_experience",
+    is_available: true
+  },
+  {
+    title: "Underground Vinyl Listening",
+    description: "Private session with rare pressings from the vault.",
+    points_cost: 1180,
+    reward_type: "secret_menu",
+    is_available: true
+  },
+  {
+    title: "Family Picnic Basket",
+    description: "Curated picnic for four at partner parks.",
+    points_cost: 410,
+    reward_type: "free_item",
+    is_available: true
+  },
+  {
+    title: "Concierge Dinner Booking",
+    description: "Priority reservations at partner restaurants for one month.",
+    points_cost: 1750,
+    reward_type: "vip_experience",
+    is_available: true
+  },
+  {
+    title: "Whisper Dessert Pairing",
+    description: "Off-menu dessert courses with paired cordials.",
+    points_cost: 990,
+    reward_type: "secret_menu",
+    is_available: true
+  },
+  {
+    title: "Eco Tote & Travel Mug",
+    description: "Reusable tote and insulated mug from the rewards shop.",
+    points_cost: 280,
+    reward_type: "free_item",
+    is_available: true
   }
 ]
 
@@ -194,7 +264,7 @@ end
 running_balance = 0
 
 base_point_transactions_seed = [
-  { amount: 1000, kind: "earn", reason_code: "signup_bonus", reason: "Initial signup reward", idempotency_key: "seed-signup-bonus" },
+  { amount: 4000, kind: "earn", reason_code: "signup_bonus", reason: "Initial signup reward", idempotency_key: "seed-signup-bonus" },
   { amount: 250, kind: "earn", reason_code: "purchase", reason: "Points earned from first purchase", idempotency_key: "seed-first-purchase" },
   { amount: 2000, kind: "earn", reason_code: "referral_bonus", reason: "Referral reward", idempotency_key: "seed-referral-bonus" },
   { amount: -80, kind: "expiry", reason_code: "expiry", reason: "Monthly point expiry adjustment", idempotency_key: "seed-monthly-expiry" }

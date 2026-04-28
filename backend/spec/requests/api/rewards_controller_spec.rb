@@ -28,7 +28,7 @@ RSpec.describe "Api::V1::RewardsController", type: :request do
         expect(body["data"].map { |r| r["title"] }).to eq([ "Coffee Voucher", "Movie Ticket" ])
         expect(body["meta"]).to include(
           "page" => 1,
-          "per_page" => 6,
+          "per_page" => 10,
           "total_count" => 2,
           "total_pages" => 1
         )

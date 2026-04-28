@@ -13,6 +13,20 @@ RSpec.describe Reward, type: :model do
       expect(reward.errors[:title]).to include("can't be blank")
     end
 
+    it "requires a description" do
+      reward = build(:reward, description: nil)
+
+      expect(reward).not_to be_valid
+      expect(reward.errors[:description]).to include("can't be blank")
+    end
+
+    it "rejects a blank description" do
+      reward = build(:reward, description: "   ")
+
+      expect(reward).not_to be_valid
+      expect(reward.errors[:description]).to include("can't be blank")
+    end
+
     it "requires a reward_type" do
       reward = build(:reward, reward_type: nil)
 

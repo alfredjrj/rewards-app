@@ -10,7 +10,7 @@ class BaseQuery
   # - /api/v1/rewards?filter[query]=coffee
   # - /api/v1/rewards?filter[reward_types][]=free_item&filter[points][lte]=300
   # - /api/v1/rewards?filter[points][gte]=100&filter[points][lte]=300
-  # - /api/v1/rewards?sort=-points_cost&page=1&per_page=6
+  # - /api/v1/rewards?sort=-points_cost&page=1&per_page=10
   #
   # Why this instead of Ransack:
   # - This API uses a strict, explicit whitelist contract for frontend clients.

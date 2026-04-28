@@ -78,7 +78,7 @@ describe("RewardsPage", () => {
           is_available: true,
         },
       ],
-      meta: { page: 1, per_page: 6, total_count: 13, total_pages: 3 },
+      meta: { page: 1, per_page: 10, total_count: 13, total_pages: 2 },
     });
   });
 
@@ -110,13 +110,13 @@ describe("RewardsPage", () => {
     renderWithQueryClient(<RewardsPage />);
 
     expect(await screen.findByText("Free Coffee")).toBeInTheDocument();
-    expect(screen.getByText("Page 1 of 3 (13 rewards)")).toBeInTheDocument();
-    expect(screen.getByText("Available points")).toBeInTheDocument();
+    expect(screen.getByText("Page 1 of 2 (13 rewards)")).toBeInTheDocument();
+    expect(screen.getByText("Available to spend")).toBeInTheDocument();
     expect(screen.getByText("690 pts")).toBeInTheDocument();
     expect(fetchRewardsMock).toHaveBeenCalledWith({
       query: "",
       page: 1,
-      perPage: 6,
+      perPage: 10,
       rewardTypes: [],
       affordableOnly: false,
       maxPoints: 690,
@@ -134,7 +134,7 @@ describe("RewardsPage", () => {
   it("handles malformed payload data without crashing", async () => {
     fetchRewardsMock.mockResolvedValue({
       data: { bad: "shape" },
-      meta: { page: 1, per_page: 6, total_count: 0, total_pages: 1 },
+      meta: { page: 1, per_page: 10, total_count: 0, total_pages: 1 },
     });
 
     renderWithQueryClient(<RewardsPage />);
@@ -157,7 +157,7 @@ describe("RewardsPage", () => {
                 is_available: true,
               },
             ],
-            meta: { page: 2, per_page: 6, total_count: 13, total_pages: 3 },
+            meta: { page: 2, per_page: 10, total_count: 13, total_pages: 2 },
           };
         }
 
@@ -172,7 +172,7 @@ describe("RewardsPage", () => {
               is_available: true,
             },
           ],
-          meta: { page: 1, per_page: 6, total_count: 13, total_pages: 3 },
+          meta: { page: 1, per_page: 10, total_count: 13, total_pages: 2 },
         };
       }
     );
@@ -188,7 +188,7 @@ describe("RewardsPage", () => {
       expect(fetchRewardsMock).toHaveBeenCalledWith({
         query: "",
         page: 2,
-        perPage: 6,
+        perPage: 10,
         rewardTypes: [],
         affordableOnly: false,
         maxPoints: 690,
@@ -202,7 +202,7 @@ describe("RewardsPage", () => {
         if (params.query === "vip") {
           return {
             data: [],
-            meta: { page: 1, per_page: 6, total_count: 0, total_pages: 1 },
+            meta: { page: 1, per_page: 10, total_count: 0, total_pages: 1 },
           };
         }
 
@@ -218,7 +218,7 @@ describe("RewardsPage", () => {
                 is_available: true,
               },
             ],
-            meta: { page: 2, per_page: 6, total_count: 13, total_pages: 3 },
+            meta: { page: 2, per_page: 10, total_count: 13, total_pages: 2 },
           };
         }
 
@@ -233,7 +233,7 @@ describe("RewardsPage", () => {
               is_available: true,
             },
           ],
-          meta: { page: 1, per_page: 6, total_count: 13, total_pages: 3 },
+          meta: { page: 1, per_page: 10, total_count: 13, total_pages: 2 },
         };
       }
     );
@@ -248,7 +248,7 @@ describe("RewardsPage", () => {
       expect(fetchRewardsMock).toHaveBeenLastCalledWith({
         query: "",
         page: 2,
-        perPage: 6,
+        perPage: 10,
         rewardTypes: [],
         affordableOnly: false,
         maxPoints: 690,
@@ -261,7 +261,7 @@ describe("RewardsPage", () => {
       expect(fetchRewardsMock).toHaveBeenLastCalledWith({
         query: "vip",
         page: 1,
-        perPage: 6,
+        perPage: 10,
         rewardTypes: [],
         affordableOnly: false,
         maxPoints: 690,
@@ -280,7 +280,7 @@ describe("RewardsPage", () => {
       expect(fetchRewardsMock).toHaveBeenLastCalledWith({
         query: "",
         page: 1,
-        perPage: 6,
+        perPage: 10,
         rewardTypes: ["vip_experience"],
         affordableOnly: false,
         maxPoints: 690,
@@ -292,7 +292,7 @@ describe("RewardsPage", () => {
       expect(fetchRewardsMock).toHaveBeenLastCalledWith({
         query: "",
         page: 1,
-        perPage: 6,
+        perPage: 10,
         rewardTypes: ["vip_experience"],
         affordableOnly: true,
         maxPoints: 690,

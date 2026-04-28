@@ -1,5 +1,5 @@
 class Api::V1::RewardsController < AuthenticationController
-  DEFAULT_PER_PAGE = 6
+  DEFAULT_PER_PAGE = 10
   MAX_PER_PAGE = 50
 
   def index
