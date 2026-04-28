@@ -9,19 +9,19 @@ RSpec.describe User::Redemptions::ProcessJob, type: :job do
     )
   end
 
-  it "delegates perform to User::Redemptions::Process with job id" do
-    allow(User::Redemptions::Process).to receive(:call)
+  it "delegates perform to User::Redemptions::FinalizeProcessing with job id" do
+    allow(User::Redemptions::FinalizeProcessing).to receive(:call)
 
     described_class.new.perform(1, 2, "req-id")
 
-    expect(User::Redemptions::Process).to have_received(:call).with(
+    expect(User::Redemptions::FinalizeProcessing).to have_received(:call).with(
       hash_including(user_id: 1, reward_id: 2, request_id: "req-id")
     )
   end
 
-  it "maps Process::TransientFailure to TransientRedemptionError for Sidekiq retries" do
-    allow(User::Redemptions::Process).to receive(:call).and_raise(
-      User::Redemptions::Process::TransientFailure,
+  it "maps FinalizeProcessing::TransientFailure to TransientRedemptionError for Sidekiq retries" do
+    allow(User::Redemptions::FinalizeProcessing).to receive(:call).and_raise(
+      User::Redemptions::FinalizeProcessing::TransientFailure,
       "Transient redemption processing failure"
     )
 

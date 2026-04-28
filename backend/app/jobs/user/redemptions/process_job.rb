@@ -6,17 +6,17 @@ class User::Redemptions::ProcessJob
   class TransientRedemptionError < StandardError; end
 
   sidekiq_retries_exhausted do |msg, ex|
-    User::Redemptions::Process.finalize_after_retries_exhausted(msg, ex)
+    User::Redemptions::FinalizeProcessing.finalize_after_retries_exhausted(msg, ex)
   end
 
   def perform(user_id, reward_id, idempotency_key)
-    User::Redemptions::Process.call(
+    User::Redemptions::FinalizeProcessing.call(
       user_id: user_id,
       reward_id: reward_id,
       request_id: idempotency_key,
       job_id: jid
     )
-  rescue User::Redemptions::Process::TransientFailure => e
+  rescue User::Redemptions::FinalizeProcessing::TransientFailure => e
     Rails.logger.warn(
       "[redemption.process_job] transient_failure jid=#{jid} user_id=#{user_id} reward_id=#{reward_id} " \
       "request_id=#{idempotency_key} error=#{e.message}"

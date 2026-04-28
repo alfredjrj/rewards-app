@@ -29,7 +29,7 @@ class Api::V1::User::RedemptionsController < AuthenticationController
     user_redemption = current_user.redemptions.build(reward: @reward)
     authorize user_redemption
 
-    enqueue_result = User::Redemptions::EnqueueProcessing.call(
+    enqueue_result = User::Redemptions::ReserveProcessing.call(
       user: current_user,
       reward: @reward,
       idempotency_key: @idempotency_key

@@ -1,6 +1,6 @@
 require "rails_helper"
 
-RSpec.describe User::Redemptions::Process do
+RSpec.describe User::Redemptions::FinalizeProcessing do
   describe ".call" do
     it "runs Create and broadcasts completed status" do
       user = create(:user)
