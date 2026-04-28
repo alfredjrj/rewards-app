@@ -1,4 +1,4 @@
-class RedemptionPolicy < ApplicationPolicy
+class User::RedemptionPolicy < ApplicationPolicy
   class Scope < ApplicationPolicy::Scope
     def resolve
       return scope.none unless user
@@ -12,6 +12,8 @@ class RedemptionPolicy < ApplicationPolicy
   end
 
   def create?
-    user.present?
+    return false unless user.present?
+    return false unless record.user_id == user.id
+    record.reward&.is_available? == true
   end
 end

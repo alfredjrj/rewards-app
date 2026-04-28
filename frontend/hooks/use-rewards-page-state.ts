@@ -22,6 +22,12 @@ type UseRewardsPageStateArgs = {
 
 const PER_PAGE = 10;
 const SEARCH_DEBOUNCE_MS = 500;
+function createIdempotencyKey(): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random()}`;
+}
 
 export function useRewardsPageState({ user, authLoading, setUser }: UseRewardsPageStateArgs) {
   const router = useRouter();
@@ -36,6 +42,7 @@ export function useRewardsPageState({ user, authLoading, setUser }: UseRewardsPa
   const [processingRequestId, setProcessingRequestId] = useState<string | null>(null);
   const [processingReward, setProcessingReward] = useState<Reward | null>(null);
   const [pendingReward, setPendingReward] = useState<Reward | null>(null);
+  const [pendingIdempotencyKey, setPendingIdempotencyKey] = useState<string | null>(null);
   const [redemptionSuccess, setRedemptionSuccess] = useState<RedemptionSuccessState | null>(null);
   const fallbackTimerRef = useRef<number | null>(null);
 
@@ -66,7 +73,8 @@ export function useRewardsPageState({ user, authLoading, setUser }: UseRewardsPa
     staleTime: 30_000,
   });
   const redeemMutation = useMutation({
-    mutationFn: (rewardId: number) => redeemReward(rewardId),
+    mutationFn: ({ rewardId, idempotencyKey }: { rewardId: number; idempotencyKey: string }) =>
+      redeemReward(rewardId, idempotencyKey),
   });
 
   useEffect(() => {
@@ -97,14 +105,14 @@ export function useRewardsPageState({ user, authLoading, setUser }: UseRewardsPa
         : "loading";
   const isLoading = rewardsQuery.isPending || rewardsQuery.isFetching;
 
-  async function handleRedeem(reward: Reward) {
+  async function handleRedeem(reward: Reward, idempotencyKey: string) {
     if (!user || redeemingId) return;
     const currentUser = user;
 
     setRedeemingId(reward.id);
     setRedeemError("");
     try {
-      const payload = await redeemMutation.mutateAsync(reward.id);
+      const payload = await redeemMutation.mutateAsync({ rewardId: reward.id, idempotencyKey });
       if (payload.data.status === "processing" && payload.data.request_id) {
         setProcessingRequestId(payload.data.request_id);
         setProcessingReward(reward);
@@ -138,14 +146,21 @@ export function useRewardsPageState({ user, authLoading, setUser }: UseRewardsPa
   }
 
   async function confirmRedeem() {
-    if (!pendingReward) return;
-    await handleRedeem(pendingReward);
+    if (!pendingReward || !pendingIdempotencyKey) return;
+    await handleRedeem(pendingReward, pendingIdempotencyKey);
     setPendingReward(null);
+    setPendingIdempotencyKey(null);
   }
 
   function openRedeemModal(reward: Reward) {
     setRedeemError("");
     setPendingReward(reward);
+    setPendingIdempotencyKey(createIdempotencyKey());
+  }
+
+  function closeRedeemModal() {
+    setPendingReward(null);
+    setPendingIdempotencyKey(null);
   }
 
   function onSearchChange(nextQuery: string) {
@@ -266,6 +281,7 @@ export function useRewardsPageState({ user, authLoading, setUser }: UseRewardsPa
     setRedemptionSuccess,
     confirmRedeem,
     openRedeemModal,
+    closeRedeemModal,
     onSearchChange,
     toggleRewardType,
     onAffordableOnlyChange,

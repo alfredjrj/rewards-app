@@ -16,8 +16,8 @@ RSpec.describe UserRedemptionsChannel, type: :channel do
     end
 
     it "rejects subscription when policy denies access" do
-      denied_policy = instance_double(RedemptionPolicy, index?: false)
-      allow(RedemptionPolicy).to receive(:new).with(user, :redemption).and_return(denied_policy)
+      denied_policy = instance_double(User::RedemptionPolicy, index?: false)
+      allow(User::RedemptionPolicy).to receive(:new).with(user, User::Redemption).and_return(denied_policy)
 
       subscribe
 

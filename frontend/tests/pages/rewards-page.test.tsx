@@ -315,7 +315,7 @@ describe("RewardsPage", () => {
     expect(await screen.findByText("Thanks, you are all set.")).toBeInTheDocument();
     expect(screen.getByText(/You redeemed/)).toBeInTheDocument();
     expect(screen.queryByText(/new balance is/i)).not.toBeInTheDocument();
-    expect(redeemRewardMock).toHaveBeenCalledWith(1);
+    expect(redeemRewardMock).toHaveBeenCalledWith(1, expect.any(String));
     expect(setUserMock).toHaveBeenCalledWith({
       id: 1,
       email: "demo@example.com",

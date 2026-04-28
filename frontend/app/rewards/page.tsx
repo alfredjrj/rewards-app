@@ -27,7 +27,7 @@ export default function RewardsPage() {
     processingRequestId,
     pendingReward,
     redemptionSuccess,
-    setPendingReward,
+    closeRedeemModal,
     setRedemptionSuccess,
     confirmRedeem,
     openRedeemModal,
@@ -147,7 +147,7 @@ export default function RewardsPage() {
             reward={pendingReward}
             currentPointsBalance={user.points_available ?? user.points_balance ?? 0}
             isSubmitting={redeemingId === pendingReward.id}
-            onCancel={() => setPendingReward(null)}
+            onCancel={closeRedeemModal}
             onConfirm={confirmRedeem}
           />
         )}

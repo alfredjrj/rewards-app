@@ -1,0 +1,48 @@
+require "rails_helper"
+
+RSpec.describe User::Redemptions::EnqueueProcessing do
+  describe ".call" do
+    let(:user) { create(:user) }
+    let(:reward) { create(:reward, points_cost: 100, is_available: true) }
+    let(:idempotency_key) { "4feb0ed2-c6ca-466a-aea0-d3b9f8e54311" }
+
+    before do
+      create(
+        :user_point_transaction,
+        user: user,
+        amount: 300,
+        running_balance: 300,
+        kind: "earn",
+        reason_code: "purchase",
+        idempotency_key: "0482e2d5-a0f5-4f53-a8d0-2f97a6ff9a26"
+      )
+    end
+
+    it "creates a processing redemption and enqueues processing job" do
+      allow(User::Redemptions::ProcessJob).to receive(:perform_in)
+
+      result = described_class.call(user: user, reward: reward, idempotency_key: idempotency_key)
+
+      expect(result.success?).to be(true)
+      expect(User::Redemptions::ProcessJob).to have_received(:perform_in).with(2.seconds, user.id, reward.id, idempotency_key)
+      redemption = user.redemptions.find_by(idempotency_key: idempotency_key)
+      expect(redemption).to be_present
+      expect(redemption.status).to eq("processing")
+    end
+
+    it "returns insufficient balance error when user cannot afford reward" do
+      expensive_reward = create(:reward, points_cost: 999, is_available: true)
+      allow(User::Redemptions::ProcessJob).to receive(:perform_in)
+
+      result = described_class.call(user: user, reward: expensive_reward, idempotency_key: idempotency_key)
+
+      expect(result.success?).to be(false)
+      expect(result.error).to eq(
+        code: "insufficient_balance",
+        message: "Insufficient points balance"
+      )
+      expect(User::Redemptions::ProcessJob).not_to have_received(:perform_in)
+      expect(user.redemptions.find_by(idempotency_key: idempotency_key)).to be_nil
+    end
+  end
+end

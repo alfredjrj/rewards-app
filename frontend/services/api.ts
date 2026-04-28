@@ -251,17 +251,12 @@ export async function fetchRewards(
   return request<PaginatedResponse<Reward>>(`/api/v1/rewards${queryString}`);
 }
 
-export async function redeemReward(rewardId: number): Promise<RedemptionResponse> {
-  const key =
-    typeof crypto !== "undefined" && "randomUUID" in crypto
-      ? crypto.randomUUID()
-      : `${Date.now()}-${Math.random()}`;
-
+export async function redeemReward(rewardId: number, idempotencyKey: string): Promise<RedemptionResponse> {
   return request("/api/v1/user/redemptions", {
     method: "POST",
     body: JSON.stringify({ redemption: { reward_id: rewardId } }),
     headers: {
-      "Idempotency-Key": key,
+      "Idempotency-Key": idempotencyKey,
     },
   });
 }

@@ -90,7 +90,7 @@ describe("services/api", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(redeemReward(1)).rejects.toThrow("Insufficient points balance");
+    await expect(redeemReward(1, "idem-error-case")).rejects.toThrow("Insufficient points balance");
   });
 
   it("uses expected path for user points endpoint", async () => {
@@ -149,13 +149,14 @@ describe("services/api", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    await redeemReward(2);
+    await redeemReward(2, "idem-123");
 
     expect(fetchMock).toHaveBeenCalledWith(
       `${TEST_API_ORIGIN}/api/v1/user/redemptions`,
       expect.objectContaining({
         method: "POST",
         body: JSON.stringify({ redemption: { reward_id: 2 } }),
+        headers: expect.objectContaining({ "Idempotency-Key": "idem-123" }),
       })
     );
   });

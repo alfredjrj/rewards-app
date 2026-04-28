@@ -63,6 +63,7 @@ describe("useRewardsPageState", () => {
   beforeEach(() => {
     vi.useRealTimers();
     vi.clearAllMocks();
+    vi.spyOn(globalThis.crypto, "randomUUID").mockReturnValue("fixed-idem-key");
     fetchRewardsMock.mockResolvedValue({
       data: [reward],
       meta: { page: 1, per_page: 10, total_count: 1, total_pages: 1 },
@@ -94,6 +95,7 @@ describe("useRewardsPageState", () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    vi.restoreAllMocks();
   });
 
   it("redirects to login when user is not authenticated", async () => {
@@ -191,7 +193,7 @@ describe("useRewardsPageState", () => {
       await result.current.confirmRedeem();
     });
 
-    expect(redeemRewardMock).toHaveBeenCalledWith(1);
+    expect(redeemRewardMock).toHaveBeenCalledWith(1, "fixed-idem-key");
     act(() => {
       cableReceivedHandler?.({
         request_id: "req-1",
@@ -227,5 +229,35 @@ describe("useRewardsPageState", () => {
       points_available: 590,
     });
     expect(result.current.pendingReward).toBeNull();
+  });
+
+  it("clears pending reward and key when modal is cancelled", async () => {
+    const { result } = renderHook(() =>
+      useRewardsPageState({
+        user,
+        authLoading: false,
+        setUser: setUserMock,
+      }),
+      { wrapper: createWrapper() }
+    );
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    act(() => {
+      result.current.openRedeemModal(reward);
+    });
+    expect(result.current.pendingReward).toEqual(reward);
+
+    act(() => {
+      result.current.closeRedeemModal();
+    });
+    expect(result.current.pendingReward).toBeNull();
+
+    await act(async () => {
+      await result.current.confirmRedeem();
+    });
+    expect(redeemRewardMock).not.toHaveBeenCalled();
   });
 });

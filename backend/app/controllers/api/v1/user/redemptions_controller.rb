@@ -1,11 +1,12 @@
 class Api::V1::User::RedemptionsController < AuthenticationController
   DEFAULT_PER_PAGE = 10
   MAX_PER_PAGE = 50
+  before_action :set_create_idempotency_key, :set_existing_redemption, only: :create
 
   def index
-    authorize :redemption, :index?
+    authorize User::Redemption, :index?
 
-    scope = policy_scope(User::Redemption, policy_scope_class: RedemptionPolicy::Scope)
+    scope = policy_scope(User::Redemption, policy_scope_class: User::RedemptionPolicy::Scope)
               .includes(:reward)
               .order(created_at: :desc, id: :desc)
     scope = RedemptionHistoryQuery.new(scope, params).call
@@ -24,43 +25,39 @@ class Api::V1::User::RedemptionsController < AuthenticationController
   end
 
   def create
-    authorize :redemption, :create?
-    idempotency_key = request.headers["Idempotency-Key"].presence || SecureRandom.uuid
-    existing = current_user.redemptions.find_by(idempotency_key: idempotency_key)
-    if existing
+    if existing_redemption?
+      authorize @existing_redemption
       render json: ::Api::V1::User::RedemptionSerializer::Status.call(
-        request_id: idempotency_key,
-        status: existing.status,
-        redemption: existing
+        request_id: @idempotency_key,
+        status: @existing_redemption.status,
+        redemption: @existing_redemption
       ), status: :accepted
       return
     end
 
-    reward = ::Reward.find(redemption_params[:reward_id])
-    current_user.redemptions.create!(
-      reward: reward,
-      points_cost_snapshot: reward.points_cost,
-      status: "processing",
-      idempotency_key: idempotency_key
-    )
+    @reward = ::Reward.find(redemption_params[:reward_id])
+    user_redemption = current_user.redemptions.build(reward: @reward)
+    authorize user_redemption
 
-    begin
-      # Demo / interview only: enqueue processing later so "processing" state is visible in UI;
-      # not a production latency strategy (use perform_async there).
-      User::Redemptions::ProcessJob.perform_in(2.second, current_user.id, reward.id, idempotency_key)
-    rescue StandardError
-      raise
+    enqueue_result = User::Redemptions::EnqueueProcessing.call(
+      user: current_user,
+      reward: @reward,
+      idempotency_key: @idempotency_key
+    )
+    unless enqueue_result.success?
+      render json: { error: enqueue_result.error }, status: :unprocessable_entity
+      return
     end
 
     render json: ::Api::V1::User::RedemptionSerializer::Status.call(
-      request_id: idempotency_key,
-      reward_id: reward.id,
+      request_id: @idempotency_key,
+      reward_id: @reward.id,
       status: "processing"
     ), status: :accepted
   end
 
   def show
-    authorize :redemption, :index?
+    authorize User::Redemption, :index?
 
     request_id = params[:id].to_s
 
@@ -104,4 +101,30 @@ class Api::V1::User::RedemptionsController < AuthenticationController
   def cache_key_for(request_id)
     "redemption_request_status:user:#{current_user.id}:#{request_id}"
   end
+
+  def existing_redemption_for(idempotency_key)
+    current_user.redemptions.find_by(idempotency_key: idempotency_key)
+  end
+
+  def set_create_idempotency_key
+    @idempotency_key = request.headers["Idempotency-Key"].presence
+    return if @idempotency_key
+
+    skip_authorization
+    render json: {
+      error: {
+        code: "idempotency_key_required",
+        message: "Idempotency-Key header is required"
+      }
+    }, status: :bad_request
+  end
+
+  def set_existing_redemption
+    @existing_redemption = existing_redemption_for(@idempotency_key)
+  end
+
+  def existing_redemption?
+    @existing_redemption.present?
+  end
+
 end

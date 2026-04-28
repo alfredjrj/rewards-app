@@ -153,6 +153,22 @@ RSpec.describe "Api::V1::User::RedemptionsController", type: :request do
         expect(redemption.status).to eq("processing")
       end
 
+      it "returns bad_request when idempotency key header is missing" do
+        allow(User::Redemptions::ProcessJob).to receive(:perform_in)
+
+        post "/api/v1/user/redemptions",
+             params: { redemption: { reward_id: reward.id } }
+
+        expect(response).to have_http_status(:bad_request)
+        expect(JSON.parse(response.body)).to eq(
+          "error" => {
+            "code" => "idempotency_key_required",
+            "message" => "Idempotency-Key header is required"
+          }
+        )
+        expect(User::Redemptions::ProcessJob).not_to have_received(:perform_in)
+      end
+
       it "returns existing status for duplicate idempotency key without enqueueing" do
         key = "406625f1-81c1-43e4-9e74-377e4c6ff31c"
         create(:user_redemption, user: user, reward: reward, idempotency_key: key, status: "completed")
@@ -167,6 +183,70 @@ RSpec.describe "Api::V1::User::RedemptionsController", type: :request do
         expect(JSON.parse(response.body)).to include(
           "data" => hash_including("request_id" => key, "status" => "completed")
         )
+      end
+
+      it "returns forbidden when reward is unavailable without creating processing row" do
+        key = "a6c0950e-c554-4504-b4ae-ef90d8de6772"
+        unavailable_reward = create(:reward, points_cost: 100, is_available: false)
+        allow(User::Redemptions::ProcessJob).to receive(:perform_in)
+
+        post "/api/v1/user/redemptions",
+             params: { redemption: { reward_id: unavailable_reward.id } },
+             headers: { "Idempotency-Key" => key }
+
+        expect(response).to have_http_status(:forbidden)
+        expect(JSON.parse(response.body)).to eq(
+          "error" => "Not authorized"
+        )
+        expect(User::Redemptions::ProcessJob).not_to have_received(:perform_in)
+        expect(user.redemptions.find_by(idempotency_key: key)).to be_nil
+      end
+
+      it "returns unprocessable_entity when points_available is less than reward cost" do
+        key = "f6b2a0f5-e8c1-40d7-a0d6-fd99dc19648e"
+        expensive_reward = create(:reward, points_cost: 999, is_available: true)
+        allow(User::Redemptions::ProcessJob).to receive(:perform_in)
+
+        post "/api/v1/user/redemptions",
+             params: { redemption: { reward_id: expensive_reward.id } },
+             headers: { "Idempotency-Key" => key }
+
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(JSON.parse(response.body)).to eq(
+          "error" => {
+            "code" => "insufficient_balance",
+            "message" => "Insufficient points balance"
+          }
+        )
+        expect(User::Redemptions::ProcessJob).not_to have_received(:perform_in)
+        expect(user.redemptions.find_by(idempotency_key: key)).to be_nil
+      end
+
+      it "checks affordability inside user lock and rejects when processing holds already consume balance" do
+        key = "e95c8305-a768-47ab-9d8e-22de8ce8e5de"
+        allow(User::Redemptions::ProcessJob).to receive(:perform_in)
+        create(
+          :user_redemption,
+          user: user,
+          reward: reward,
+          points_cost_snapshot: 250,
+          status: "processing",
+          idempotency_key: "inflight-1"
+        )
+
+        post "/api/v1/user/redemptions",
+             params: { redemption: { reward_id: reward.id } },
+             headers: { "Idempotency-Key" => key }
+
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(JSON.parse(response.body)).to eq(
+          "error" => {
+            "code" => "insufficient_balance",
+            "message" => "Insufficient points balance"
+          }
+        )
+        expect(User::Redemptions::ProcessJob).not_to have_received(:perform_in)
+        expect(user.redemptions.find_by(idempotency_key: key)).to be_nil
       end
     end
   end
