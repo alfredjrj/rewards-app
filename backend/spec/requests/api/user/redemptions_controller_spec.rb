@@ -112,7 +112,7 @@ RSpec.describe "Api::V1::User::RedemptionsController", type: :request do
 
     context "when signed in" do
       let(:user) { create(:user) }
-      let(:csrf_token) { @csrf_token }
+      let(:csrf_token) { fetch_csrf_token_for(user) }
 
       before do
         sign_in user
@@ -125,9 +125,6 @@ RSpec.describe "Api::V1::User::RedemptionsController", type: :request do
           reason_code: "purchase",
           idempotency_key: "e3e1e313-a70b-4dbc-81e0-f6868503595d"
         )
-        get "/api/v1/user"
-        @csrf_token = JSON.parse(response.body).dig("meta", "csrf_token")
-        sign_in user
       end
 
       it "enqueues async redemption processing and returns processing state" do
