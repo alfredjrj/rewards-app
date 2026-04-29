@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { getUserRedemptions, User } from "@/services/api";
 import { useAuthenticatedPaginatedQuery } from "@/hooks/use-authenticated-paginated-query";
+import { usePaginationControls } from "@/hooks/use-pagination-controls";
 import { writeSearchScope } from "@/lib/search-scope";
 
 const PER_PAGE = 10;
@@ -47,23 +48,16 @@ export function useRedemptionsPageState({ user, authLoading }: UseRedemptionsPag
   const error = redemptionsQuery.error;
   const status = redemptionsQuery.status;
   const isLoading = redemptionsQuery.isLoading;
-
-  function onPreviousPage() {
-    setPage((p) => Math.max(1, p - 1));
-  }
-
-  function onNextPage() {
-    setPage((p) => Math.min(totalPages, p + 1));
-  }
+  const { goToFirstPage, onPreviousPage, onNextPage } = usePaginationControls({ setPage, totalPages });
 
   function onStatusFilterChange(nextStatus: StatusOption | "") {
     setStatusFilter(nextStatus);
-    setPage(1);
+    goToFirstPage();
   }
 
   function onSortChange(nextSort: SortOption) {
     setSort(nextSort);
-    setPage(1);
+    goToFirstPage();
   }
 
   return {

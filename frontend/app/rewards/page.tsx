@@ -2,13 +2,11 @@
 
 import Navbar from "@/components/Navbar";
 import { useAuth } from "@/lib/auth-context";
-import {
-  getRewardTypeMeta,
-  RewardTypeIcon,
-} from "@/components/rewards/reward-type";
+import RewardCard from "@/components/rewards/reward-card";
 import RewardsGridSkeleton from "@/components/rewards/rewards-grid-skeleton";
 import RedeemConfirmationModal from "@/components/rewards/redeem-confirmation-modal";
 import RedemptionSuccessBanner from "@/components/rewards/redemption-success-banner";
+import PaginationBar from "@/components/ui/pagination-bar";
 import { useRewardsPageState } from "@/hooks/use-rewards-page-state";
 import { REWARD_TYPES, RewardType } from "@/services/api";
 
@@ -222,49 +220,15 @@ export default function RewardsPage() {
 
         {!isLoading && !error && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {rewards.map((reward) => {
-              const typeMeta = getRewardTypeMeta(reward.reward_type);
-              return (
-              <article
+            {rewards.map((reward) => (
+              <RewardCard
                 key={reward.id}
-                className="bg-white rounded-2xl border border-purple-100 shadow-sm p-6"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-start gap-3">
-                    <span
-                      className={`inline-flex h-14 w-14 items-center justify-center rounded-2xl ${typeMeta.accentClass}`}
-                      aria-hidden="true"
-                    >
-                      <RewardTypeIcon type={reward.reward_type} />
-                    </span>
-                    <div>
-                      <h2 className="text-lg font-semibold text-gray-900">{reward.title}</h2>
-                      <p className="text-xs font-medium text-zinc-500 mt-0.5">{typeMeta.label}</p>
-                    </div>
-                  </div>
-                  <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${typeMeta.badgeClass}`}>Reward</span>
-                </div>
-                <p className="text-gray-600 mt-2">{reward.description}</p>
-                <div className="mt-4 flex items-center justify-between">
-                  <span className="text-sm text-purple-700 font-semibold">
-                    {reward.points_cost} points
-                  </span>
-                  <button
-                    type="button"
-                    disabled={
-                      !reward.is_available ||
-                      redeemingId === reward.id ||
-                      pointsAvailable < reward.points_cost
-                    }
-                    onClick={() => openRedeemModal(reward)}
-                    className="px-3 py-1.5 rounded-lg border border-purple-200 text-xs font-medium text-purple-700 disabled:opacity-50"
-                  >
-                    {redeemingId === reward.id ? "Redeeming..." : "Redeem"}
-                  </button>
-                </div>
-              </article>
-              );
-            })}
+                reward={reward}
+                redeeming={redeemingId === reward.id}
+                canRedeem={reward.is_available && pointsAvailable >= reward.points_cost}
+                onRedeem={openRedeemModal}
+              />
+            ))}
 
             {rewards.length === 0 && (
               <div className="col-span-full text-gray-500 bg-white rounded-2xl border border-gray-200 p-6 text-center">
@@ -275,29 +239,14 @@ export default function RewardsPage() {
         )}
 
         {!isLoading && !error && totalCount > 0 && (
-          <div className="mt-6 flex items-center justify-between bg-white rounded-2xl border border-purple-100 p-4">
-            <p className="text-sm text-gray-600">
-              Page {page} of {totalPages} ({totalCount} rewards)
-            </p>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={onPreviousPage}
-                disabled={page <= 1}
-                className="px-4 py-2 rounded-lg border border-gray-200 text-sm disabled:opacity-50"
-              >
-                Previous
-              </button>
-              <button
-                type="button"
-                onClick={onNextPage}
-                disabled={page >= totalPages}
-                className="px-4 py-2 rounded-lg border border-gray-200 text-sm disabled:opacity-50"
-              >
-                Next
-              </button>
-            </div>
-          </div>
+          <PaginationBar
+            page={page}
+            totalPages={totalPages}
+            totalCount={totalCount}
+            itemLabel="rewards"
+            onPrevious={onPreviousPage}
+            onNext={onNextPage}
+          />
         )}
       </main>
     </div>

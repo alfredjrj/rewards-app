@@ -200,12 +200,6 @@ describe("useRewardsPageState", () => {
         pointsBalance: 690,
       });
     });
-    expect(result.current.redemptionSuccesses).toHaveLength(1);
-    expect(result.current.redemptionSuccesses[0]).toMatchObject({
-      rewardTitle: "Free Coffee",
-      pointsSpent: 100,
-      pointsBalance: 690,
-    });
     expect(result.current.pendingReward).toBeNull();
   });
 

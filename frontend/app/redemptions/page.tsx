@@ -1,16 +1,11 @@
 "use client";
 
 import Navbar from "@/components/Navbar";
+import RedemptionsTable from "@/components/redemptions/redemptions-table";
+import PaginationBar from "@/components/ui/pagination-bar";
 import { useAuth } from "@/lib/auth-context";
 import RedemptionsTableSkeleton from "@/components/redemptions/redemptions-table-skeleton";
 import { useRedemptionsPageState } from "@/hooks/use-redemptions-page-state";
-
-const STATUS_BADGE_STYLES: Record<string, string> = {
-  processing: "bg-amber-100 text-amber-800",
-  completed: "bg-green-100 text-green-800",
-  failed: "bg-rose-100 text-rose-800",
-  cancelled: "bg-zinc-200 text-zinc-800",
-};
 
 export default function RedemptionsPage() {
   const { user, loading: authLoading } = useAuth();
@@ -136,62 +131,17 @@ export default function RedemptionsPage() {
         {isLoading && <RedemptionsTableSkeleton />}
         {error && <div className="text-red-600 bg-red-50 border border-red-200 rounded-xl p-4">{error}</div>}
 
-        {!isLoading && !error && (
-          <section className="bg-white rounded-2xl border border-purple-100 shadow-sm overflow-hidden">
-            <div className="grid grid-cols-12 gap-3 px-5 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500 border-b border-gray-100">
-              <div className="col-span-5">Reward</div>
-              <div className="col-span-2">Points</div>
-              <div className="col-span-2">Status</div>
-              <div className="col-span-3">Date</div>
-            </div>
-
-            {rows.length > 0 ? (
-              rows.map((row) => (
-                <div key={row.id} className="grid grid-cols-12 gap-3 px-5 py-4 text-sm border-b border-gray-50 last:border-b-0">
-                  <div className="col-span-5 text-gray-900 font-medium">{row.reward_title}</div>
-                  <div className="col-span-2 text-purple-700 font-semibold">{row.points_cost_snapshot}</div>
-                  <div className="col-span-2">
-                    <span
-                      className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
-                        STATUS_BADGE_STYLES[row.status] || "bg-slate-100 text-slate-800"
-                      }`}
-                    >
-                      {row.status === "processing" ? "pending" : row.status}
-                    </span>
-                  </div>
-                  <div className="col-span-3 text-gray-600">{new Date(row.created_at).toLocaleString()}</div>
-                </div>
-              ))
-            ) : (
-              <div className="p-6 text-center text-gray-500">No redemptions yet.</div>
-            )}
-          </section>
-        )}
+        {!isLoading && !error && <RedemptionsTable rows={rows} />}
 
         {!isLoading && !error && totalCount > 0 && (
-          <div className="mt-6 flex items-center justify-between bg-white rounded-2xl border border-purple-100 p-4">
-            <p className="text-sm text-gray-600">
-              Page {page} of {totalPages} ({totalCount} redemptions)
-            </p>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={onPreviousPage}
-                disabled={page <= 1}
-                className="px-4 py-2 rounded-lg border border-gray-200 text-sm disabled:opacity-50"
-              >
-                Previous
-              </button>
-              <button
-                type="button"
-                onClick={onNextPage}
-                disabled={page >= totalPages}
-                className="px-4 py-2 rounded-lg border border-gray-200 text-sm disabled:opacity-50"
-              >
-                Next
-              </button>
-            </div>
-          </div>
+          <PaginationBar
+            page={page}
+            totalPages={totalPages}
+            totalCount={totalCount}
+            itemLabel="redemptions"
+            onPrevious={onPreviousPage}
+            onNext={onNextPage}
+          />
         )}
       </main>
     </div>

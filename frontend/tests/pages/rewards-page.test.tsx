@@ -8,6 +8,7 @@ import RewardsPage from "@/app/rewards/page";
 const replaceMock = vi.fn();
 const fetchRewardsMock = vi.fn();
 const redeemRewardMock = vi.fn();
+const getRedemptionStatusMock = vi.fn();
 const getUserPointsMock = vi.fn();
 const routerMock = { replace: replaceMock };
 function renderWithQueryClient(ui: ReactElement) {
@@ -41,6 +42,7 @@ vi.mock("@/services/api", () => ({
   REWARD_TYPES: ["vip_experience", "free_item", "secret_menu"],
   fetchRewards: (...args: unknown[]) => fetchRewardsMock(...args),
   redeemReward: (...args: unknown[]) => redeemRewardMock(...args),
+  getRedemptionStatus: (...args: unknown[]) => getRedemptionStatusMock(...args),
   getUserPoints: (...args: unknown[]) => getUserPointsMock(...args),
 }));
 
