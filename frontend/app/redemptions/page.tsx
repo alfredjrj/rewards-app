@@ -8,6 +8,7 @@ import PageHeader from "@/components/ui/page-header";
 import { useAuth } from "@/lib/auth-context";
 import RedemptionsTableSkeleton from "@/components/redemptions/redemptions-table-skeleton";
 import { useRedemptionsPageState } from "@/hooks/use-redemptions-page-state";
+import type { RedemptionFilterStatus, RedemptionSortOption } from "@/types/redemptions";
 
 export default function RedemptionsPage() {
   const { user, loading: authLoading } = useAuth();
@@ -46,18 +47,18 @@ export default function RedemptionsPage() {
 
   if (!user) return null;
 
-  const statusOptions = [
-    { label: "All", value: "" as const },
-    { label: "Pending", value: "processing" as const },
-    { label: "Completed", value: "completed" as const },
-    { label: "Failed", value: "failed" as const },
-    { label: "Cancelled", value: "cancelled" as const },
+  const statusOptions: Array<{ label: string; value: RedemptionFilterStatus | "" }> = [
+    { label: "All", value: "" },
+    { label: "Pending", value: "processing" },
+    { label: "Completed", value: "completed" },
+    { label: "Failed", value: "failed" },
+    { label: "Cancelled", value: "cancelled" },
   ];
-  const sortOptions = [
-    { label: "Newest", value: "-created_at" as const },
-    { label: "Oldest", value: "created_at" as const },
-    { label: "Highest points", value: "-points_cost_snapshot" as const },
-    { label: "Lowest points", value: "points_cost_snapshot" as const },
+  const sortOptions: Array<{ label: string; value: RedemptionSortOption }> = [
+    { label: "Newest", value: "-created_at" },
+    { label: "Oldest", value: "created_at" },
+    { label: "Highest points", value: "-points_cost_snapshot" },
+    { label: "Lowest points", value: "points_cost_snapshot" },
   ];
 
   return (

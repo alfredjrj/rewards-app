@@ -1,7 +1,7 @@
 "use client";
 
 import DataTable, { DataTableColumn } from "@/components/ui/data-table";
-import { RedemptionHistoryItem } from "@/services/api";
+import type { RedemptionHistoryItem } from "@/types/redemptions";
 
 const STATUS_BADGE_STYLES: Record<string, string> = {
   processing: "bg-amber-100 text-amber-800",

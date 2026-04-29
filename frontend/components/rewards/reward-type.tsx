@@ -1,8 +1,6 @@
 "use client";
 
-import { Reward } from "@/services/api";
-
-export type RewardType = Reward["reward_type"];
+import type { RewardType } from "@/types/rewards";
 
 type RewardTypeMeta = {
   label: string;

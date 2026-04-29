@@ -24,7 +24,8 @@ RSpec.describe "User sessions", type: :request do
       expect(response).to have_http_status(:unauthorized)
       json = JSON.parse(response.body)
       expect(json["error"]).to eq(
-        I18n.t("devise.failure.invalid", authentication_keys: User.human_attribute_name(:email))
+        "code" => "authentication_failed",
+        "message" => I18n.t("devise.failure.invalid", authentication_keys: User.human_attribute_name(:email))
       )
     end
 

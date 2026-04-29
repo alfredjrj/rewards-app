@@ -11,9 +11,13 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: replaceMock }),
 }));
 
-vi.mock("@/services/api", () => ({
-  getUserRedemptions: (...args: unknown[]) => getUserRedemptionsMock(...args),
-}));
+vi.mock("@/services/api", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/services/api")>();
+  return {
+    ...actual,
+    getUserRedemptions: (...args: unknown[]) => getUserRedemptionsMock(...args),
+  };
+});
 
 describe("useRedemptionsPageState", () => {
   const user = { id: 1, email: "demo@example.com", points_balance: 690 };

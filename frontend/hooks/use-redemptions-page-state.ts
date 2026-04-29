@@ -1,16 +1,19 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getUserRedemptions, User } from "@/services/api";
+import { getUserRedemptions } from "@/services/api";
 import { useAuthenticatedPaginatedQuery } from "@/hooks/use-authenticated-paginated-query";
 import { usePaginationControls } from "@/hooks/use-pagination-controls";
 import { writeSearchScope } from "@/lib/search-scope";
+import {
+  REDEMPTION_SORT_OPTIONS,
+  REDEMPTION_STATUSES,
+} from "@/types/redemptions";
+import type { RedemptionFilterStatus, RedemptionSortOption } from "@/types/redemptions";
+import type { User } from "@/types/user";
 
 const PER_PAGE = 10;
-const SORT_OPTIONS = ["-created_at", "created_at", "-points_cost_snapshot", "points_cost_snapshot"] as const;
-const STATUS_OPTIONS = ["processing", "completed", "failed", "cancelled"] as const;
-type SortOption = typeof SORT_OPTIONS[number];
-type StatusOption = typeof STATUS_OPTIONS[number];
+const DEFAULT_SORT: RedemptionSortOption = "-created_at";
 
 type UseRedemptionsPageStateArgs = {
   user: User | null;
@@ -19,8 +22,8 @@ type UseRedemptionsPageStateArgs = {
 
 export function useRedemptionsPageState({ user, authLoading }: UseRedemptionsPageStateArgs) {
   const [page, setPage] = useState(1);
-  const [statusFilter, setStatusFilter] = useState<StatusOption | "">("");
-  const [sort, setSort] = useState<SortOption>("-created_at");
+  const [statusFilter, setStatusFilter] = useState<RedemptionFilterStatus | "">("");
+  const [sort, setSort] = useState<RedemptionSortOption>(DEFAULT_SORT);
   const redemptionsQuery = useAuthenticatedPaginatedQuery({
     queryKey: [
       "redemptions",
@@ -31,7 +34,7 @@ export function useRedemptionsPageState({ user, authLoading }: UseRedemptionsPag
         page,
         perPage: PER_PAGE,
         status: statusFilter || undefined,
-        sort,
+        sort: REDEMPTION_SORT_OPTIONS.includes(sort) ? sort : DEFAULT_SORT,
       }),
     user,
     authLoading,
@@ -50,12 +53,14 @@ export function useRedemptionsPageState({ user, authLoading }: UseRedemptionsPag
   const isLoading = redemptionsQuery.isLoading;
   const { goToFirstPage, onPreviousPage, onNextPage } = usePaginationControls({ setPage, totalPages });
 
-  function onStatusFilterChange(nextStatus: StatusOption | "") {
+  function onStatusFilterChange(nextStatus: RedemptionFilterStatus | "") {
+    if (nextStatus && !REDEMPTION_STATUSES.includes(nextStatus)) return;
     setStatusFilter(nextStatus);
     goToFirstPage();
   }
 
-  function onSortChange(nextSort: SortOption) {
+  function onSortChange(nextSort: RedemptionSortOption) {
+    if (!REDEMPTION_SORT_OPTIONS.includes(nextSort)) return;
     setSort(nextSort);
     goToFirstPage();
   }

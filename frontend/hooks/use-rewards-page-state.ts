@@ -2,13 +2,15 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { fetchRewards, getRedemptionStatus, getUserPoints, redeemReward, Reward, User } from "@/services/api";
+import { fetchRewards, getRedemptionStatus, getUserPoints, redeemReward } from "@/services/api";
 import { useAuthenticatedPaginatedQuery } from "@/hooks/use-authenticated-paginated-query";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { usePaginationControls } from "@/hooks/use-pagination-controls";
 import { useRedemptionProcessingTracker } from "@/hooks/use-redemption-processing-tracker";
 import { StoredProcessingRedemption } from "@/lib/processing-redemptions";
 import { readSearchScope, writeSearchScope } from "@/lib/search-scope";
+import type { Reward } from "@/types/rewards";
+import type { User } from "@/types/user";
 
 type RedemptionSuccessState = {
   id: string;
@@ -63,9 +65,13 @@ export function useRewardsPageState({ user, authLoading }: UseRewardsPageStateAr
     staleTime: 10_000,
   });
   const points = pointsQuery.data;
-  const pointsBalance = points?.points_balance ?? 0;
-  const pointsPendingRedemption = points?.points_pending_redemption ?? 0;
-  const pointsAvailable = points?.points_available ?? pointsBalance;
+  const pointsPayload =
+    (points as { data?: { points_balance?: number; points_pending_redemption?: number; points_available?: number } })
+      ?.data ??
+    (points as { points_balance?: number; points_pending_redemption?: number; points_available?: number } | undefined);
+  const pointsBalance = pointsPayload?.points_balance ?? 0;
+  const pointsPendingRedemption = pointsPayload?.points_pending_redemption ?? 0;
+  const pointsAvailable = pointsPayload?.points_available ?? pointsBalance;
 
   const rewardsQuery = useAuthenticatedPaginatedQuery<Reward>({
     queryKey: [
@@ -111,7 +117,10 @@ export function useRewardsPageState({ user, authLoading }: UseRewardsPageStateAr
           queryKey: pointsQueryKeyRef.current,
           queryFn: getUserPoints,
         });
-        latestPointsBalance = refreshedPoints.points_balance;
+        const refreshedPayload =
+          (refreshedPoints as { data?: { points_balance?: number } })?.data ??
+          (refreshedPoints as { points_balance?: number } | undefined);
+        latestPointsBalance = refreshedPayload?.points_balance ?? latestPointsBalance;
       } catch {
         // Keep completion UX even if points refresh fails transiently.
       }

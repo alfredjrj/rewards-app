@@ -7,7 +7,12 @@ RSpec.describe "Api::V1::User::RedemptionsController", type: :request do
         get "/api/v1/user/redemptions"
 
         expect(response).to have_http_status(:unauthorized)
-        expect(JSON.parse(response.body)).to eq("error" => "Not authenticated")
+        expect(JSON.parse(response.body)).to eq(
+          "error" => {
+            "code" => "not_authenticated",
+            "message" => "Not authenticated"
+          }
+        )
       end
     end
 
@@ -106,7 +111,12 @@ RSpec.describe "Api::V1::User::RedemptionsController", type: :request do
         post "/api/v1/user/redemptions", params: { redemption: { reward_id: reward.id } }
 
         expect(response).to have_http_status(:unauthorized)
-        expect(JSON.parse(response.body)).to eq("error" => "Not authenticated")
+        expect(JSON.parse(response.body)).to eq(
+          "error" => {
+            "code" => "not_authenticated",
+            "message" => "Not authenticated"
+          }
+        )
       end
     end
 

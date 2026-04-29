@@ -34,9 +34,13 @@ vi.mock("@/lib/auth-context", () => ({
   useAuth: () => authState,
 }));
 
-vi.mock("@/services/api", () => ({
-  getUserRedemptions: (...args: unknown[]) => getUserRedemptionsMock(...args),
-}));
+vi.mock("@/services/api", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/services/api")>();
+  return {
+    ...actual,
+    getUserRedemptions: (...args: unknown[]) => getUserRedemptionsMock(...args),
+  };
+});
 
 vi.mock("@/components/Navbar", () => ({
   default: () => <nav data-testid="navbar" />,

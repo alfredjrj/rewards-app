@@ -1,11 +1,17 @@
 class Users::SessionsController < Devise::SessionsController
+  include ApiErrorRenderable
+
   respond_to :json
 
   def create
     self.resource = warden.authenticate(auth_options)
 
     unless resource
-      return render json: { error: devise_failure_message }, status: :unauthorized
+      return render_api_error(
+        code: "authentication_failed",
+        message: devise_failure_message,
+        status: :unauthorized
+      )
     end
 
     sign_in(resource_name, resource)

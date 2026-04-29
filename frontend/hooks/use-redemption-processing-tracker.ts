@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { RedemptionStatusResponse } from "@/services/api";
+import type { RedemptionStatusResponse } from "@/types/redemptions";
 import { getCableConsumer } from "@/lib/cable";
 import {
   readProcessingRedemptions,
@@ -18,7 +18,7 @@ type AddProcessingRewardArgs = {
 type UseRedemptionProcessingTrackerArgs = {
   onCompleted: (args: { requestId: string; processing: StoredProcessingRedemption }) => void | Promise<void>;
   onFailed: (errorMessage: string) => void;
-  pollStatus: (requestId: string) => Promise<RedemptionStatusResponse["data"]>;
+  pollStatus: (requestId: string) => Promise<RedemptionStatusResponse>;
   pollIntervalMs?: number;
 };
 
@@ -101,7 +101,7 @@ export function useRedemptionProcessingTracker({
         activeRequestIds.map(async (requestId) => {
           try {
             const statusPayload = await pollStatus(requestId);
-            await handleCompletion(statusPayload);
+            await handleCompletion(statusPayload.data);
           } catch {
             // keep polling; transient failures should not break completion tracking
           }

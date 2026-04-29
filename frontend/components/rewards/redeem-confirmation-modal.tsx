@@ -1,6 +1,6 @@
 "use client";
 
-import { Reward } from "@/services/api";
+import type { Reward } from "@/types/rewards";
 import { getRewardTypeMeta, RewardTypeIcon } from "@/components/rewards/reward-type";
 import ModalDialog from "@/components/ui/modal-dialog";
 

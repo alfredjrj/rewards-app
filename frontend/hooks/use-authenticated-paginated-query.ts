@@ -3,7 +3,8 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { PaginatedResponse, User } from "@/services/api";
+import type { PaginatedResponse } from "@/types/api";
+import type { User } from "@/types/user";
 
 type UseAuthenticatedPaginatedQueryArgs<T> = {
   queryKey: readonly unknown[];

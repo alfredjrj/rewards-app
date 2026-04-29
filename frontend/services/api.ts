@@ -1,21 +1,49 @@
 import { getPublicApiUrl } from "@/lib/public-api-url";
+import { ApiErrorResponse, PaginatedResponse } from "@/types/api";
+import {
+  FetchRewardsOptions,
+  REWARD_SORT_OPTIONS,
+  REWARD_TYPES,
+  Reward,
+  RewardSortOption,
+  RewardType,
+} from "@/types/rewards";
+import {
+  GetUserRedemptionsOptions,
+  REDEMPTION_SORT_OPTIONS,
+  REDEMPTION_STATUSES,
+  RedemptionFilterStatus,
+  RedemptionHistoryItem,
+  RedemptionResponse,
+  RedemptionSortOption,
+  RedemptionStatus,
+  RedemptionStatusResponse,
+} from "@/types/redemptions";
+import { User, UserPoints, UserProfileResponse } from "@/types/user";
 
-export interface User {
-  id: number;
-  email: string;
-  points_balance?: number;
-  /** Points reserved by DB-backed redemptions in processing status. */
-  points_pending_redemption?: number;
-  /** Ledger balance minus pending; spendable before jobs finish. */
-  points_available?: number;
-}
-
-export interface UserProfileResponse {
-  data: User;
-  meta?: {
-    csrf_token?: string;
-  };
-}
+export type { ApiError, ApiErrorResponse, PaginatedResponse } from "@/types/api";
+export {
+  REWARD_TYPES,
+  REWARD_SORT_OPTIONS,
+  REDEMPTION_STATUSES,
+  REDEMPTION_SORT_OPTIONS,
+};
+export type {
+  FetchRewardsOptions,
+  GetUserRedemptionsOptions,
+  RedemptionFilterStatus,
+  RedemptionHistoryItem,
+  RedemptionResponse,
+  RedemptionSortOption,
+  RedemptionStatus,
+  RedemptionStatusResponse,
+  Reward,
+  RewardSortOption,
+  RewardType,
+  User,
+  UserPoints,
+  UserProfileResponse,
+};
 
 type AuthUserResponse = {
   user: User;
@@ -23,94 +51,6 @@ type AuthUserResponse = {
     csrf_token?: string;
   };
 };
-
-export interface UserPoints {
-  data: {
-    points_balance: number;
-    points_pending_redemption: number;
-    points_available: number;
-  };
-}
-
-export interface UserPointsPayload {
-  points_balance: number;
-  points_pending_redemption: number;
-  points_available: number;
-}
-
-export const REWARD_TYPES = ["vip_experience", "free_item", "secret_menu"] as const;
-export type RewardType = (typeof REWARD_TYPES)[number];
-
-export interface Reward {
-  id: number;
-  title: string;
-  description: string;
-  points_cost: number;
-  reward_type: RewardType;
-  is_available: boolean;
-}
-
-export interface RedemptionResponse {
-  data: {
-    id?: number;
-    request_id?: string;
-    reward_id: number;
-    points_cost_snapshot?: number;
-    status: string;
-    points_balance?: number;
-  };
-}
-
-export interface RedemptionStatusResponse {
-  data: {
-    request_id: string;
-    reward_id?: number;
-    status: "processing" | "completed" | "failed";
-    error?: {
-      code: string;
-      message: string;
-    };
-  };
-}
-
-export interface RedemptionHistoryItem {
-  id: number;
-  reward_id: number;
-  reward_title: string;
-  points_cost_snapshot: number;
-  status: string;
-  created_at: string;
-}
-
-export interface GetUserRedemptionsOptions {
-  page?: number;
-  perPage?: number;
-  status?: "processing" | "completed" | "failed" | "cancelled";
-  minPoints?: number;
-  maxPoints?: number;
-  sort?: "created_at" | "-created_at" | "points_cost_snapshot" | "-points_cost_snapshot";
-}
-
-export interface PaginatedResponse<T> {
-  data: T[];
-  meta: {
-    page: number;
-    per_page: number;
-    total_count: number;
-    total_pages: number;
-  };
-}
-
-export interface FetchRewardsOptions {
-  query?: string;
-  page?: number;
-  perPage?: number;
-  rewardTypes?: Reward["reward_type"][];
-  minPoints?: number;
-  affordableOnly?: boolean;
-  maxPoints?: number;
-  sort?: "title" | "-title" | "points_cost" | "-points_cost" | "created_at" | "-created_at";
-}
 
 let csrfToken: string | null = null;
 
@@ -122,45 +62,9 @@ function methodIsUnsafe(method?: string): boolean {
 function parseErrorMessage(data: unknown): string {
   if (!data || typeof data !== "object") return "Request failed";
 
-  const payload = data as {
-    error?: string | { message?: string };
-    errors?: Array<string | { message?: string }> | Record<string, string[]>;
-  };
-
-  if (typeof payload.error === "string" && payload.error.trim()) {
-    return payload.error;
-  }
-
-  if (
-    payload.error &&
-    typeof payload.error === "object" &&
-    typeof payload.error.message === "string" &&
-    payload.error.message.trim()
-  ) {
+  const payload = data as ApiErrorResponse;
+  if (payload.error?.message?.trim()) {
     return payload.error.message;
-  }
-
-  if (Array.isArray(payload.errors)) {
-    const firstError = payload.errors[0];
-    if (typeof firstError === "string" && firstError.trim()) {
-      return firstError;
-    }
-    if (
-      firstError &&
-      typeof firstError === "object" &&
-      typeof firstError.message === "string" &&
-      firstError.message.trim()
-    ) {
-      return firstError.message;
-    }
-  }
-
-  if (payload.errors && typeof payload.errors === "object" && !Array.isArray(payload.errors)) {
-    const firstKey = Object.keys(payload.errors)[0];
-    const msgs = firstKey ? payload.errors[firstKey] : undefined;
-    if (Array.isArray(msgs) && typeof msgs[0] === "string" && msgs[0].trim()) {
-      return msgs[0];
-    }
   }
 
   return "Request failed";
@@ -248,15 +152,14 @@ export async function logout(): Promise<void> {
   csrfToken = null;
 }
 
-export async function getCurrentUser(): Promise<User> {
+export async function getCurrentUser(): Promise<UserProfileResponse> {
   const payload = await request<UserProfileResponse>("/api/v1/user");
   csrfToken = payload.meta?.csrf_token || null;
-  return payload.data;
+  return payload;
 }
 
-export async function getUserPoints(): Promise<UserPointsPayload> {
-  const payload = await request<UserPoints>("/api/v1/user/points");
-  return payload.data;
+export async function getUserPoints(): Promise<UserPoints> {
+  return request<UserPoints>("/api/v1/user/points");
 }
 
 export async function fetchRewards(
@@ -290,11 +193,10 @@ export async function redeemReward(rewardId: number, idempotencyKey: string): Pr
   });
 }
 
-export async function getRedemptionStatus(requestId: string): Promise<RedemptionStatusResponse["data"]> {
-  const payload = await request<RedemptionStatusResponse>(
+export async function getRedemptionStatus(requestId: string): Promise<RedemptionStatusResponse> {
+  return request<RedemptionStatusResponse>(
     `/api/v1/user/redemptions/${encodeURIComponent(requestId)}`
   );
-  return payload.data;
 }
 
 export async function getUserRedemptions(options: GetUserRedemptionsOptions = {}): Promise<PaginatedResponse<RedemptionHistoryItem>> {

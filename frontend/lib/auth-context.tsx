@@ -10,7 +10,8 @@ import {
   useState,
   ReactNode,
 } from "react";
-import { User, getCurrentUser } from "@/services/api";
+import { getCurrentUser } from "@/services/api";
+import type { User } from "@/types/user";
 import { disconnectCableConsumer } from "@/lib/cable";
 
 interface AuthContextValue {
@@ -35,7 +36,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refreshUser = useCallback(async () => {
     const profile = await getCurrentUser();
-    setUser(profile);
+    const resolvedUser = (profile as unknown as { data?: User }).data ?? (profile as unknown as User);
+    setUser(resolvedUser);
   }, []);
 
   useEffect(() => {

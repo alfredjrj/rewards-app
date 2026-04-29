@@ -1,4 +1,6 @@
 class Users::RegistrationsController < Devise::RegistrationsController
+  include ApiErrorRenderable
+
   respond_to :json
 
   def create
@@ -12,7 +14,12 @@ class Users::RegistrationsController < Devise::RegistrationsController
         meta: { csrf_token: form_authenticity_token }
       }, status: :created
     else
-      render json: { errors: resource.errors.full_messages }, status: :unprocessable_entity
+      render_api_error(
+        code: "validation_error",
+        message: "Validation failed",
+        status: :unprocessable_entity,
+        details: { fields: resource.errors.to_hash(true) }
+      )
     end
   end
 

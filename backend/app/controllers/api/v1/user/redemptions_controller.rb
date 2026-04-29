@@ -36,7 +36,12 @@ class Api::V1::User::RedemptionsController < AuthenticationController
     )
     unless enqueue_result.success?
       error_status = enqueue_result.error&.dig(:code) == "enqueue_unavailable" ? :service_unavailable : :unprocessable_entity
-      render json: { error: enqueue_result.error }, status: error_status
+      render_api_error(
+        code: enqueue_result.error&.dig(:code) || "redemption_failed",
+        message: enqueue_result.error&.dig(:message) || "Unable to process redemption",
+        status: error_status,
+        details: enqueue_result.error&.dig(:details)
+      )
       return
     end
 
@@ -84,12 +89,11 @@ class Api::V1::User::RedemptionsController < AuthenticationController
     end
 
     skip_authorization
-    render json: {
-      error: {
-        code: "not_found",
-        message: "No redemption found for request id"
-      }
-    }, status: :not_found
+    render_api_error(
+      code: "not_found",
+      message: "No redemption found for request id",
+      status: :not_found
+    )
   end
 
   private
@@ -111,7 +115,12 @@ class Api::V1::User::RedemptionsController < AuthenticationController
     end
 
     skip_authorization
-    render json: { error: result.error }, status: :bad_request
+    render_api_error(
+      code: result.error&.dig(:code) || "invalid_request",
+      message: result.error&.dig(:message) || "Invalid request",
+      status: :bad_request,
+      details: result.error&.dig(:details)
+    )
   end
 
   def load_and_render_existing_redemption

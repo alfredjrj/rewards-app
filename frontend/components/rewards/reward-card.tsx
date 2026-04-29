@@ -1,7 +1,7 @@
 "use client";
 
 import { getRewardTypeMeta, RewardTypeIcon } from "@/components/rewards/reward-type";
-import { Reward } from "@/services/api";
+import type { Reward } from "@/types/rewards";
 
 type RewardCardProps = {
   reward: Reward;

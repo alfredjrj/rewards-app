@@ -7,7 +7,12 @@ RSpec.describe "Api::V1::RewardsController", type: :request do
         get "/api/v1/rewards"
 
         expect(response).to have_http_status(:unauthorized)
-        expect(JSON.parse(response.body)).to eq("error" => "Not authenticated")
+        expect(JSON.parse(response.body)).to eq(
+          "error" => {
+            "code" => "not_authenticated",
+            "message" => "Not authenticated"
+          }
+        )
       end
     end
 

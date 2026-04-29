@@ -1,4 +1,5 @@
 class AuthenticationController < ApplicationController
+  include ApiErrorRenderable
   include Pundit::Authorization
 
   before_action :authenticate_user!
@@ -17,7 +18,11 @@ class AuthenticationController < ApplicationController
   def authenticate_user!
     return if current_user
 
-    render json: { error: "Not authenticated" }, status: :unauthorized
+    render_api_error(
+      code: "not_authenticated",
+      message: "Not authenticated",
+      status: :unauthorized
+    )
   end
 
   def verify_csrf_token!
@@ -25,39 +30,27 @@ class AuthenticationController < ApplicationController
     return if valid_authenticity_token?(session, request.headers["X-CSRF-Token"].to_s)
 
     skip_authorization
-    render json: {
-      error: {
-        code: "invalid_csrf_token",
-        message: "X-CSRF-Token is missing or invalid"
-      }
-    }, status: :forbidden
+    render_api_error(
+      code: "invalid_csrf_token",
+      message: "X-CSRF-Token is missing or invalid",
+      status: :forbidden
+    )
   end
 
   def user_not_authorized
-    render json: {
-      error: {
-        code: "forbidden",
-        message: "Not authorized"
-      }
-    }, status: :forbidden
+    render_api_error(code: "forbidden", message: "Not authorized", status: :forbidden)
   end
 
   def record_not_found
-    render json: {
-      error: {
-        code: "not_found",
-        message: "Resource not found"
-      }
-    }, status: :not_found
+    render_api_error(code: "not_found", message: "Resource not found", status: :not_found)
   end
 
   def parameter_missing(exception)
-    render json: {
-      error: {
-        code: "parameter_missing",
-        message: exception.message
-      }
-    }, status: :bad_request
+    render_api_error(
+      code: "parameter_missing",
+      message: exception.message,
+      status: :bad_request
+    )
   end
 
   def verify_pundit_authorization!

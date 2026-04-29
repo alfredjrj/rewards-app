@@ -47,7 +47,7 @@ describe("services/api", () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: false,
       headers: { get: () => "application/json" },
-      json: async () => ({ error: "Invalid Email or password." }),
+      json: async () => ({ error: { code: "authentication_failed", message: "Invalid Email or password." } }),
     });
     vi.stubGlobal("fetch", fetchMock);
 
@@ -59,7 +59,7 @@ describe("services/api", () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: false,
       headers: { get: () => "application/json" },
-      json: async () => ({ error: "Not authenticated" }),
+      json: async () => ({ error: { code: "not_authenticated", message: "Not authenticated" } }),
     });
     vi.stubGlobal("fetch", fetchMock);
 
@@ -76,7 +76,7 @@ describe("services/api", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(getCurrentUser()).resolves.toEqual({ id: 1, email: "demo@example.com" });
+    await expect(getCurrentUser()).resolves.toEqual({ data: { id: 1, email: "demo@example.com" } });
 
     expect(fetchMock).toHaveBeenCalledWith(
       `${TEST_API_ORIGIN}/api/v1/user`,
@@ -106,7 +106,7 @@ describe("services/api", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(getUserPoints()).resolves.toEqual({ points_balance: 690 });
+    await expect(getUserPoints()).resolves.toEqual({ data: { points_balance: 690 } });
 
     expect(fetchMock).toHaveBeenCalledWith(
       `${TEST_API_ORIGIN}/api/v1/user/points`,

@@ -10,7 +10,8 @@ import FilterChips from "@/components/ui/filter-chips";
 import PaginationBar from "@/components/ui/pagination-bar";
 import PageHeader from "@/components/ui/page-header";
 import { useRewardsPageState } from "@/hooks/use-rewards-page-state";
-import { REWARD_TYPES, RewardType } from "@/services/api";
+import { REWARD_TYPES } from "@/types/rewards";
+import type { RewardType } from "@/types/rewards";
 
 const REWARD_TYPE_LABELS: Record<RewardType, string> = {
   free_item: "Free Item",
