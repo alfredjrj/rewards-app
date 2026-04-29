@@ -2,7 +2,9 @@
 
 import Navbar from "@/components/Navbar";
 import RedemptionsTable from "@/components/redemptions/redemptions-table";
+import FilterChips from "@/components/ui/filter-chips";
 import PaginationBar from "@/components/ui/pagination-bar";
+import PageHeader from "@/components/ui/page-header";
 import { useAuth } from "@/lib/auth-context";
 import RedemptionsTableSkeleton from "@/components/redemptions/redemptions-table-skeleton";
 import { useRedemptionsPageState } from "@/hooks/use-redemptions-page-state";
@@ -62,68 +64,32 @@ export default function RedemptionsPage() {
     <div className="min-h-screen bg-purple-50">
       <Navbar />
       <main className="max-w-6xl mx-auto px-6 py-10">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-purple-900">Redemption History</h1>
-          <p className="text-purple-600 mt-2">Track your recent reward redemptions.</p>
-        </div>
+        <PageHeader title="Redemption History" subtitle="Track your recent reward redemptions." />
 
-        <section className="mb-6 rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+        <section className="mb-6 rounded-2xl border border-zinc-200/80 bg-white/90 p-5 shadow-sm backdrop-blur">
           <div className="mb-4 flex items-center justify-between">
             <p className="text-sm font-semibold text-zinc-900">Filters</p>
             <p className="text-xs text-zinc-500">Refine your redemption timeline</p>
           </div>
-
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
-              <p className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-zinc-500">Status</p>
-              <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-1">
-                <div className="flex flex-wrap gap-1.5" role="group" aria-label="Status">
-                  {statusOptions.map((option) => {
-                    const isActive = statusFilter === option.value;
-                    return (
-                      <button
-                        key={option.label}
-                        type="button"
-                        onClick={() => onStatusFilterChange(option.value)}
-                        aria-pressed={isActive}
-                        className={`rounded-lg px-3 py-1.5 text-sm transition ${
-                          isActive
-                            ? "bg-zinc-900 text-white shadow-sm"
-                            : "text-zinc-600 hover:bg-white hover:text-zinc-900"
-                        }`}
-                      >
-                        {option.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+              <p className="mb-2 block text-xs font-semibold uppercase tracking-wide text-zinc-600">Status</p>
+              <FilterChips
+                options={statusOptions}
+                isSelected={(value) => statusFilter === value}
+                onSelect={onStatusFilterChange}
+                groupAriaLabel="Status"
+              />
             </div>
 
             <div>
-              <p className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-zinc-500">Sort by</p>
-              <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-1">
-                <div className="flex flex-wrap gap-1.5" role="group" aria-label="Sort by">
-                  {sortOptions.map((option) => {
-                    const isActive = sort === option.value;
-                    return (
-                      <button
-                        key={option.label}
-                        type="button"
-                        onClick={() => onSortChange(option.value)}
-                        aria-pressed={isActive}
-                        className={`rounded-lg px-3 py-1.5 text-sm transition ${
-                          isActive
-                            ? "bg-zinc-900 text-white shadow-sm"
-                            : "text-zinc-600 hover:bg-white hover:text-zinc-900"
-                        }`}
-                      >
-                        {option.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+              <p className="mb-2 block text-xs font-semibold uppercase tracking-wide text-zinc-600">Sort by</p>
+              <FilterChips
+                options={sortOptions}
+                isSelected={(value) => sort === value}
+                onSelect={onSortChange}
+                groupAriaLabel="Sort by"
+              />
             </div>
           </div>
         </section>
