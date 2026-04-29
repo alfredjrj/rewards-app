@@ -12,6 +12,10 @@ class User < ApplicationRecord
            class_name: "User::Redemption",
            inverse_of: :user,
            dependent: :restrict_with_error
+  has_many :redemption_audits,
+           class_name: "User::RedemptionAudit",
+           inverse_of: :user,
+           dependent: :restrict_with_error
 
   def current_points_balance
     point_transactions.order(id: :desc).pick(:running_balance) || 0

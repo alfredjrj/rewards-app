@@ -3,7 +3,7 @@ module User::Redemptions
   # Supports idempotent replay and terminal-state short-circuiting.
   class Create
     TERMINAL_STATUSES = %w[completed failed cancelled].freeze
-    Result = Struct.new(:success?, :redemption, :points_balance, :error, keyword_init: true)
+    Result = Struct.new(:success?, :redemption, :points_balance, :point_transaction, :error, keyword_init: true)
 
     def self.call(...)
       new(...).call
@@ -25,7 +25,11 @@ module User::Redemptions
       points_result = complete_redemption!(redemption)
       return failure_from_points_result(points_result) unless points_result.success?
 
-      success(redemption, points_result.transaction.running_balance)
+      success(
+        redemption,
+        points_result.transaction.running_balance,
+        points_result.transaction
+      )
     rescue ActiveRecord::RecordInvalid => e
       Rails.logger.warn(e.full_message)
       failure(
@@ -106,12 +110,24 @@ module User::Redemptions
       user.current_points_balance
     end
 
-    def success(redemption, points_balance)
-      Result.new(success?: true, redemption: redemption, points_balance: points_balance, error: nil)
+    def success(redemption, points_balance, point_transaction = nil)
+      Result.new(
+        success?: true,
+        redemption: redemption,
+        points_balance: points_balance,
+        point_transaction: point_transaction,
+        error: nil
+      )
     end
 
     def failure_from_points_result(points_result)
-      Result.new(success?: false, redemption: nil, points_balance: nil, error: points_result.error)
+      Result.new(
+        success?: false,
+        redemption: nil,
+        points_balance: nil,
+        point_transaction: nil,
+        error: points_result.error
+      )
     end
 
     def failure(code, message, details: nil)
@@ -119,6 +135,7 @@ module User::Redemptions
         success?: false,
         redemption: nil,
         points_balance: nil,
+        point_transaction: nil,
         error: {
           code: code,
           message: message,

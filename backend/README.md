@@ -60,6 +60,10 @@ This service owns:
 ## Key Concepts
 
 - **Ledger-based points**: point changes are append-only `User::PointTransaction` rows with `running_balance`.
+- **Audit source-of-truth split**:
+  - `User::PointTransaction` is the financial source of truth for balances/reconciliation.
+  - `User::RedemptionAudit` stores change-by-change snapshots of `User::Redemption` for operational history.
+  - Audit rows keep references (`user_redemption_id`, optional `point_transaction_id`) so snapshot history can be joined to ledger facts.
 - **Idempotent redemptions**: `Idempotency-Key` is required on create redemption requests.
 - **Two-phase redemption**:
   1. reserve a `processing` redemption (`PlaceCreditHoldAndEnqueue`)
@@ -90,3 +94,50 @@ The worker completes phase two asynchronously:
 - executes the redemption business logic
 - marks the request as `completed` or `failed`
 - publishes status updates for realtime clients and polling fallback (`GET /api/v1/user/redemptions/:id`)
+
+## Redemption Audit Snapshots
+
+Redemption lifecycle auditing is snapshot-based:
+
+- each persisted redemption change writes one `User::RedemptionAudit` row
+- each row stores a single `snapshot` JSON (the state after that change)
+- previous state is derived from the prior row for the same `user_redemption_id`
+- `point_transaction_id` is optional and linked when a related ledger row exists
+
+This keeps the model simple while preserving full history of object evolution.
+
+### Why single snapshot (no before_snapshot)
+
+`User::RedemptionAudit` intentionally stores only one snapshot per row:
+
+- lower write/storage overhead than storing both before/after payloads
+- cleaner write path (every change appends exactly one record)
+- prior state can be reconstructed from the previous audit row in time order
+
+This is enough for lifecycle history while keeping schema and writes minimal.
+
+### Source-of-truth contract
+
+- `user_point_transactions` answers financial questions:
+  - what changed the balance
+  - exact debit/credit amounts
+  - reconciliation
+- `user_redemption_audits` answers operational history questions:
+  - how redemption object values evolved over time
+  - when status or other attributes changed
+  - linkage to financial side effects (optional `point_transaction_id`)
+
+When debugging or auditing a redemption:
+
+1. find `user_redemptions` by request/idempotency key
+2. inspect `user_redemption_audits` ordered by `created_at`
+3. follow `point_transaction_id` when present for ledger proof
+
+Typical query:
+
+```sql
+SELECT created_at, change_reason, change_source, snapshot, point_transaction_id
+FROM user_redemption_audits
+WHERE user_redemption_id = :redemption_id
+ORDER BY created_at ASC, id ASC;
+```

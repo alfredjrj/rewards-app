@@ -6,10 +6,18 @@ RSpec.describe User::Redemptions::Process do
       user = create(:user)
       reward = create(:reward)
       key = "b87d35ad-bc4f-42bc-b94c-ed00356e7238"
+      redemption = create(
+        :user_redemption,
+        user: user,
+        reward: reward,
+        status: "processing",
+        idempotency_key: key
+      )
       result = instance_double(
         "ServiceResponse",
         success?: true,
-        redemption: instance_double(User::Redemption, reward_id: reward.id)
+        redemption: instance_double(User::Redemption, reward_id: reward.id),
+        point_transaction: nil
       )
       allow(User::Redemptions::Create).to receive(:call).and_return(result)
       allow(ActionCable.server).to receive(:broadcast)
@@ -29,6 +37,7 @@ RSpec.describe User::Redemptions::Process do
           status: "completed"
         )
       )
+      expect(redemption.audits.where(change_reason: "updated")).to be_empty
     end
 
     it "raises TransientFailure for infrastructure errors" do
@@ -90,6 +99,13 @@ RSpec.describe User::Redemptions::Process do
       user = create(:user)
       reward = create(:reward)
       key = "11111111-2222-3333-4444-555555555555"
+      redemption = create(
+        :user_redemption,
+        user: user,
+        reward: reward,
+        status: "processing",
+        idempotency_key: key
+      )
       error = { code: "insufficient_balance", message: "Not enough points" }
       result = instance_double("ServiceResponse", success?: false, error: error)
       allow(User::Redemptions::Create).to receive(:call).and_return(result)
@@ -101,6 +117,9 @@ RSpec.describe User::Redemptions::Process do
         "user_redemptions:#{user.id}",
         hash_including(request_id: key, status: "failed", error: error)
       )
+      update_audit = redemption.audits.where(change_reason: "updated").order(:id).last
+      expect(update_audit).to be_present
+      expect(update_audit.snapshot).to include("status" => "failed")
     end
   end
 

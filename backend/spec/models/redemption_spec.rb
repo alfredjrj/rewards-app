@@ -28,4 +28,37 @@ RSpec.describe User::Redemption, type: :model do
     expect(duplicate).not_to be_valid
     expect(duplicate.errors[:idempotency_key]).to include("has already been taken")
   end
+
+  describe "audit snapshots" do
+    it "creates a created audit row on insert" do
+      redemption = create(:user_redemption, status: "processing")
+
+      audit = redemption.audits.order(:id).last
+      expect(audit).to be_present
+      expect(audit.change_reason).to eq("created")
+      expect(audit.snapshot).to include("status" => "processing")
+      expect(audit.point_transaction_id).to be_nil
+    end
+
+    it "creates updated audit row and links related point transaction when present" do
+      redemption = create(:user_redemption, status: "processing")
+      points_tx = create(
+        :user_point_transaction,
+        user: redemption.user,
+        amount: -redemption.points_cost_snapshot,
+        running_balance: 0,
+        kind: "redeem",
+        reason_code: "reward_redemption",
+        idempotency_key: "status-change-tx-1",
+        source: redemption
+      )
+
+      redemption.update!(status: "completed")
+
+      audit = redemption.audits.where(change_reason: "updated").order(:id).last
+      expect(audit).to be_present
+      expect(audit.snapshot).to include("status" => "completed")
+      expect(audit.point_transaction_id).to eq(points_tx.id)
+    end
+  end
 end

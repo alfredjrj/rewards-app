@@ -119,6 +119,7 @@ This account has **`admin: true`** (needed for **`/sidekiq`** — see Terminal 2
 - Redemption operations must validate business rules (for example: reward availability and sufficient points) before creating a redemption record.
 - Redemption creation runs asynchronously (Sidekiq + Redis): the API returns `202 Accepted` with `processing`, then completion is delivered over Action Cable.
 - Frontend keeps a polling fallback against `GET /api/v1/user/redemptions/:id` so users do not get stuck if websocket delivery is missed.
+- Backend keeps append-only `user_redemption_audits` rows (single snapshot per change) so redemption object evolution can be audited over time.
 
 ---
 

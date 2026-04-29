@@ -28,6 +28,10 @@ RSpec.describe User::Redemptions::PlaceCreditHoldAndEnqueue do
       redemption = user.redemptions.find_by(idempotency_key: idempotency_key)
       expect(redemption).to be_present
       expect(redemption.status).to eq("processing")
+      audit = redemption.audits.order(:id).last
+      expect(audit).to be_present
+      expect(audit.change_reason).to eq("created")
+      expect(audit.snapshot).to include("status" => "processing")
     end
 
     it "returns insufficient balance error when user cannot afford reward" do
@@ -76,6 +80,9 @@ RSpec.describe User::Redemptions::PlaceCreditHoldAndEnqueue do
       redemption = user.redemptions.find_by(idempotency_key: idempotency_key)
       expect(redemption).to be_present
       expect(redemption.status).to eq("failed")
+      update_audit = redemption.audits.where(change_reason: "updated").order(:id).last
+      expect(update_audit).to be_present
+      expect(update_audit.snapshot).to include("status" => "failed")
     end
 
     it "creates exactly one processing redemption under concurrent calls with same idempotency key", :concurrency do

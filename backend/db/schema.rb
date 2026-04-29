@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_04_28_031500) do
+ActiveRecord::Schema[8.0].define(version: 2026_04_29_214000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -51,6 +51,31 @@ ActiveRecord::Schema[8.0].define(version: 2026_04_28_031500) do
     t.check_constraint "running_balance >= 0", name: "chk_user_point_transactions_running_balance_non_negative"
   end
 
+  create_table "user_redemption_audits", force: :cascade do |t|
+    t.bigint "user_redemption_id", null: false
+    t.bigint "user_id", null: false
+    t.bigint "reward_id", null: false
+    t.bigint "point_transaction_id"
+    t.string "request_id", null: false
+    t.string "change_source", null: false
+    t.string "change_reason", null: false
+    t.jsonb "snapshot", default: {}, null: false
+    t.jsonb "metadata", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["change_reason", "created_at"], name: "index_user_redemption_audits_on_change_reason_and_created_at"
+    t.index ["point_transaction_id"], name: "index_user_redemption_audits_on_point_transaction_id"
+    t.index ["request_id"], name: "index_user_redemption_audits_on_request_id"
+    t.index ["reward_id"], name: "index_user_redemption_audits_on_reward_id"
+    t.index ["user_id", "created_at"], name: "index_user_redemption_audits_on_user_id_and_created_at"
+    t.index ["user_id"], name: "index_user_redemption_audits_on_user_id"
+    t.index ["user_redemption_id", "created_at"], name: "idx_on_user_redemption_id_created_at_14c1a4ca51"
+    t.index ["user_redemption_id"], name: "index_user_redemption_audits_on_user_redemption_id"
+    t.check_constraint "char_length(change_reason::text) > 0", name: "chk_user_redemption_audits_change_reason_not_blank"
+    t.check_constraint "char_length(change_source::text) > 0", name: "chk_user_redemption_audits_change_source_not_blank"
+    t.check_constraint "char_length(request_id::text) > 0", name: "chk_user_redemption_audits_request_id_not_blank"
+  end
+
   create_table "user_redemptions", comment: "Reward redemption records for users", force: :cascade do |t|
     t.bigint "user_id", null: false, comment: "User who redeemed the reward"
     t.bigint "reward_id", null: false, comment: "Reward that was redeemed"
@@ -64,7 +89,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_04_28_031500) do
     t.index ["user_id", "idempotency_key"], name: "index_user_redemptions_on_user_id_and_idempotency_key", unique: true
     t.index ["user_id"], name: "index_user_redemptions_on_user_id"
     t.check_constraint "points_cost_snapshot >= 0", name: "chk_redemptions_points_cost_snapshot_non_negative"
-    t.check_constraint "status::text = ANY (ARRAY['processing'::character varying, 'completed'::character varying, 'failed'::character varying, 'cancelled'::character varying]::text[])", name: "chk_redemptions_status_valid"
+    t.check_constraint "status::text = ANY (ARRAY['processing'::character varying::text, 'completed'::character varying::text, 'failed'::character varying::text, 'cancelled'::character varying::text])", name: "chk_redemptions_status_valid"
   end
 
   create_table "users", force: :cascade do |t|
@@ -82,6 +107,10 @@ ActiveRecord::Schema[8.0].define(version: 2026_04_28_031500) do
   end
 
   add_foreign_key "user_point_transactions", "users"
+  add_foreign_key "user_redemption_audits", "rewards"
+  add_foreign_key "user_redemption_audits", "user_point_transactions", column: "point_transaction_id"
+  add_foreign_key "user_redemption_audits", "user_redemptions"
+  add_foreign_key "user_redemption_audits", "users"
   add_foreign_key "user_redemptions", "rewards"
   add_foreign_key "user_redemptions", "users"
 end

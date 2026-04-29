@@ -25,9 +25,18 @@ RSpec.describe User::Redemptions::Create do
       expect(result.redemption).to be_persisted
       expect(result.redemption.reward).to eq(reward)
       expect(result.points_balance).to eq(380)
+      expect(result.point_transaction).to be_present
       debit = user.point_transactions.order(:id).last
       expect(debit.amount).to eq(-120)
       expect(debit.source).to eq(result.redemption)
+      expect(result.point_transaction.id).to eq(debit.id)
+      audits = result.redemption.audits.order(:id)
+      expect(audits.pluck(:change_reason)).to eq([ "created", "updated" ])
+      expect(audits.last.snapshot).to include(
+        "status" => "completed",
+        "points_cost_snapshot" => reward.points_cost
+      )
+      expect(audits.last.point_transaction_id).to eq(debit.id)
     end
 
     it "returns idempotent hit for duplicate key" do
@@ -91,6 +100,11 @@ RSpec.describe User::Redemptions::Create do
       debit = user.point_transactions.order(:id).last
       expect(debit.amount).to eq(-120)
       expect(debit.source).to eq(processing)
+      expect(result.point_transaction.id).to eq(debit.id)
+      update_audit = processing.audits.where(change_reason: "updated").order(:id).last
+      expect(update_audit).to be_present
+      expect(update_audit.snapshot).to include("status" => "completed")
+      expect(update_audit.point_transaction_id).to eq(debit.id)
     end
 
     it "does not resurrect a failed redemption on replay with same idempotency key" do
