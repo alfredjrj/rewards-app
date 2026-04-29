@@ -235,4 +235,5 @@ describe("RedemptionsPage", () => {
       });
     });
   });
+
 });

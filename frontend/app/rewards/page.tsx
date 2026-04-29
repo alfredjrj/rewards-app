@@ -35,9 +35,9 @@ export default function RewardsPage() {
     redeemingId,
     processingRequestId,
     pendingReward,
-    redemptionSuccess,
+    redemptionSuccesses,
     closeRedeemModal,
-    setRedemptionSuccess,
+    dismissRedemptionSuccess,
     confirmRedeem,
     openRedeemModal,
     onSearchChange,
@@ -143,13 +143,14 @@ export default function RewardsPage() {
           </div>
         </div>
 
-        {redemptionSuccess && (
+        {redemptionSuccesses.map((success) => (
           <RedemptionSuccessBanner
-            rewardTitle={redemptionSuccess.rewardTitle}
-            pointsSpent={redemptionSuccess.pointsSpent}
-            onDismiss={() => setRedemptionSuccess(null)}
+            key={success.id}
+            rewardTitle={success.rewardTitle}
+            pointsSpent={success.pointsSpent}
+            onDismiss={() => dismissRedemptionSuccess(success.id)}
           />
-        )}
+        ))}
 
         {pendingReward && (
           <RedeemConfirmationModal

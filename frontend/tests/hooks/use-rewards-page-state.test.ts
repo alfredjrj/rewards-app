@@ -62,6 +62,7 @@ describe("useRewardsPageState", () => {
   beforeEach(() => {
     vi.useRealTimers();
     vi.clearAllMocks();
+    window.sessionStorage.clear();
     vi.spyOn(globalThis.crypto, "randomUUID").mockReturnValue("fixed-idem-key");
     fetchRewardsMock.mockResolvedValue({
       data: [reward],
@@ -192,13 +193,15 @@ describe("useRewardsPageState", () => {
     });
 
     await waitFor(() => {
-      expect(result.current.redemptionSuccess).toEqual({
+      expect(result.current.redemptionSuccesses).toHaveLength(1);
+      expect(result.current.redemptionSuccesses[0]).toMatchObject({
         rewardTitle: "Free Coffee",
         pointsSpent: 100,
         pointsBalance: 690,
       });
     });
-    expect(result.current.redemptionSuccess).toEqual({
+    expect(result.current.redemptionSuccesses).toHaveLength(1);
+    expect(result.current.redemptionSuccesses[0]).toMatchObject({
       rewardTitle: "Free Coffee",
       pointsSpent: 100,
       pointsBalance: 690,
@@ -233,5 +236,48 @@ describe("useRewardsPageState", () => {
       await result.current.confirmRedeem();
     });
     expect(redeemRewardMock).not.toHaveBeenCalled();
+  });
+
+  it("rehydrates processing redemptions from session storage after refresh", async () => {
+    window.sessionStorage.setItem(
+      "processing_redemptions",
+      JSON.stringify([
+        {
+          requestId: "req-refresh",
+          rewardTitle: "Free Coffee",
+          pointsSpent: 100,
+        },
+      ])
+    );
+
+    const { result } = renderHook(() =>
+      useRewardsPageState({
+        user,
+        authLoading: false,
+      }),
+      { wrapper: createWrapper() }
+    );
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    act(() => {
+      cableReceivedHandler?.({
+        request_id: "req-refresh",
+        reward_id: 1,
+        status: "completed",
+      });
+    });
+
+    await waitFor(() => {
+      expect(result.current.redemptionSuccesses).toHaveLength(1);
+      expect(result.current.redemptionSuccesses[0]).toMatchObject({
+        id: "req-refresh",
+        rewardTitle: "Free Coffee",
+        pointsSpent: 100,
+      });
+    });
+    expect(JSON.parse(window.sessionStorage.getItem("processing_redemptions") || "[]")).toEqual([]);
   });
 });

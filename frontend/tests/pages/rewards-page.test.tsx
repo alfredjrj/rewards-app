@@ -319,4 +319,70 @@ describe("RewardsPage", () => {
     expect(redeemRewardMock).toHaveBeenCalledWith(1, expect.any(String));
   });
 
+  it("stacks success banners for multiple completed redemptions", async () => {
+    fetchRewardsMock.mockResolvedValue({
+      data: [
+        {
+          id: 1,
+          title: "Free Coffee",
+          description: "Redeem for one free coffee.",
+          points_cost: 100,
+          reward_type: "free_item",
+          is_available: true,
+        },
+        {
+          id: 2,
+          title: "$5 Gift Card",
+          description: "Redeem for a gift card.",
+          points_cost: 250,
+          reward_type: "free_item",
+          is_available: true,
+        },
+      ],
+      meta: { page: 1, per_page: 10, total_count: 2, total_pages: 1 },
+    });
+
+    redeemRewardMock
+      .mockResolvedValueOnce({
+        data: {
+          id: 101,
+          reward_id: 1,
+          points_cost_snapshot: 100,
+          status: "completed",
+          points_balance: 590,
+        },
+      })
+      .mockResolvedValueOnce({
+        data: {
+          id: 102,
+          reward_id: 2,
+          points_cost_snapshot: 250,
+          status: "completed",
+          points_balance: 340,
+        },
+      });
+
+    const user = userEvent.setup();
+    renderWithQueryClient(<RewardsPage />);
+
+    expect(await screen.findByText("Free Coffee")).toBeInTheDocument();
+    expect(screen.getByText("$5 Gift Card")).toBeInTheDocument();
+
+    await user.click(screen.getAllByRole("button", { name: "Redeem" })[0]);
+    await user.click(screen.getByRole("button", { name: "Confirm redeem" }));
+    await waitFor(() => {
+      expect(screen.getAllByText("Thanks, you are all set.")).toHaveLength(1);
+      expect(screen.getAllByText(/You redeemed/)).toHaveLength(1);
+    });
+
+    await user.click(screen.getAllByRole("button", { name: "Redeem" })[1]);
+    await user.click(screen.getByRole("button", { name: "Confirm redeem" }));
+
+    await waitFor(() => {
+      expect(screen.getAllByText("Thanks, you are all set.")).toHaveLength(2);
+      expect(screen.getAllByText(/You redeemed/)).toHaveLength(2);
+    });
+    expect(redeemRewardMock).toHaveBeenCalledTimes(2);
+  });
+
 });
