@@ -34,6 +34,7 @@ module Backend
     # Cookie-based session for Devise auth
     config.middleware.use ActionDispatch::Cookies
     config.middleware.use ActionDispatch::Session::CookieStore, key: "_rewards_session"
+    config.middleware.use Rack::Attack
 
     # Same-site lax allows cross-site cookies on top-level navigations
     config.action_dispatch.cookies_same_site_protection = :lax

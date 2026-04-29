@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchRewards, getRedemptionStatus, getUserPoints, redeemReward, Reward, RedemptionStatusResponse, User } from "@/services/api";
+import { useAuthenticatedPaginatedQuery } from "@/hooks/use-authenticated-paginated-query";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { getCableConsumer } from "@/lib/cable";
 import { readProcessingRedemptions, StoredProcessingRedemption, writeProcessingRedemptions } from "@/lib/processing-redemptions";
@@ -34,7 +34,6 @@ function createIdempotencyKey(): string {
 }
 
 export function useRewardsPageState({ user, authLoading }: UseRewardsPageStateArgs) {
-  const router = useRouter();
   const queryClient = useQueryClient();
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
@@ -83,7 +82,7 @@ export function useRewardsPageState({ user, authLoading }: UseRewardsPageStateAr
   const pointsPendingRedemption = points?.points_pending_redemption ?? 0;
   const pointsAvailable = points?.points_available ?? pointsBalance;
 
-  const rewardsQuery = useQuery({
+  const rewardsQuery = useAuthenticatedPaginatedQuery<Reward>({
     queryKey: [
       "rewards",
       {
@@ -95,29 +94,23 @@ export function useRewardsPageState({ user, authLoading }: UseRewardsPageStateAr
         maxPoints: pointsAvailable,
       },
     ],
-    queryFn: () => {
-      return fetchRewards({
+    queryFn: () =>
+      fetchRewards({
         query: debouncedQuery,
         page,
         perPage: PER_PAGE,
         rewardTypes: selectedRewardTypes,
         affordableOnly,
         maxPoints: pointsAvailable,
-      });
-    },
-    enabled: !authLoading && Boolean(user),
-    staleTime: 30_000,
+      }),
+    user,
+    authLoading,
+    errorMessage: "Failed to load rewards",
   });
   const redeemMutation = useMutation({
     mutationFn: ({ rewardId, idempotencyKey }: { rewardId: number; idempotencyKey: string }) =>
       redeemReward(rewardId, idempotencyKey),
   });
-
-  useEffect(() => {
-    if (!authLoading && !user) {
-      router.replace("/login");
-    }
-  }, [user, authLoading, router]);
 
   useEffect(() => {
     const previousScope = readSearchScope();
@@ -146,23 +139,12 @@ export function useRewardsPageState({ user, authLoading }: UseRewardsPageStateAr
     setPage(1);
   }, [debouncedQuery]);
 
-  const rewards = useMemo(
-    () => (Array.isArray(rewardsQuery.data?.data) ? rewardsQuery.data.data : []),
-    [rewardsQuery.data]
-  );
-  const totalPages = rewardsQuery.data?.meta?.total_pages ?? 1;
-  const totalCount = rewardsQuery.data?.meta?.total_count ?? rewards.length;
-  const queryError =
-    rewardsQuery.error instanceof Error ? rewardsQuery.error.message : "Failed to load rewards";
-  const error = redeemError || (rewardsQuery.isError ? queryError : "");
-  const status = authLoading || !user
-    ? "idle"
-    : rewardsQuery.isError
-      ? "error"
-      : rewardsQuery.isSuccess
-        ? "success"
-        : "loading";
-  const isLoading = rewardsQuery.isPending || rewardsQuery.isFetching;
+  const rewards = rewardsQuery.rows;
+  const totalPages = rewardsQuery.totalPages;
+  const totalCount = rewardsQuery.totalCount;
+  const error = redeemError || rewardsQuery.error;
+  const status = rewardsQuery.status;
+  const isLoading = rewardsQuery.isLoading;
 
   useEffect(() => {
     processingRequestsRef.current = processingRequests;

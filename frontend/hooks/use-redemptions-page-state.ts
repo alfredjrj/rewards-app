@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 import { getUserRedemptions, User } from "@/services/api";
+import { useAuthenticatedPaginatedQuery } from "@/hooks/use-authenticated-paginated-query";
 import { writeSearchScope } from "@/lib/search-scope";
 
 const PER_PAGE = 10;
@@ -18,11 +17,10 @@ type UseRedemptionsPageStateArgs = {
 };
 
 export function useRedemptionsPageState({ user, authLoading }: UseRedemptionsPageStateArgs) {
-  const router = useRouter();
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<StatusOption | "">("");
   const [sort, setSort] = useState<SortOption>("-created_at");
-  const redemptionsQuery = useQuery({
+  const redemptionsQuery = useAuthenticatedPaginatedQuery({
     queryKey: [
       "redemptions",
       { page, perPage: PER_PAGE, statusFilter, sort },
@@ -34,39 +32,21 @@ export function useRedemptionsPageState({ user, authLoading }: UseRedemptionsPag
         status: statusFilter || undefined,
         sort,
       }),
-    enabled: !authLoading && Boolean(user),
-    staleTime: 30_000,
+    user,
+    authLoading,
+    errorMessage: "Failed to load redemptions",
   });
-
-  useEffect(() => {
-    if (!authLoading && !user) {
-      router.replace("/login");
-    }
-  }, [authLoading, user, router]);
 
   useEffect(() => {
     writeSearchScope("redemptions");
   }, []);
 
-  const rows = useMemo(
-    () => (Array.isArray(redemptionsQuery.data?.data) ? redemptionsQuery.data.data : []),
-    [redemptionsQuery.data]
-  );
-  const totalPages = redemptionsQuery.data?.meta?.total_pages ?? 1;
-  const totalCount = redemptionsQuery.data?.meta?.total_count ?? rows.length;
-  const error = redemptionsQuery.isError
-    ? redemptionsQuery.error instanceof Error
-      ? redemptionsQuery.error.message
-      : "Failed to load redemptions"
-    : "";
-  const status = authLoading || !user
-    ? "idle"
-    : redemptionsQuery.isError
-      ? "error"
-      : redemptionsQuery.isSuccess
-        ? "success"
-        : "loading";
-  const isLoading = redemptionsQuery.isPending || redemptionsQuery.isFetching;
+  const rows = redemptionsQuery.rows;
+  const totalPages = redemptionsQuery.totalPages;
+  const totalCount = redemptionsQuery.totalCount;
+  const error = redemptionsQuery.error;
+  const status = redemptionsQuery.status;
+  const isLoading = redemptionsQuery.isLoading;
 
   function onPreviousPage() {
     setPage((p) => Math.max(1, p - 1));
