@@ -10,6 +10,13 @@ import RewardsGridSkeleton from "@/components/rewards/rewards-grid-skeleton";
 import RedeemConfirmationModal from "@/components/rewards/redeem-confirmation-modal";
 import RedemptionSuccessBanner from "@/components/rewards/redemption-success-banner";
 import { useRewardsPageState } from "@/hooks/use-rewards-page-state";
+import { REWARD_TYPES, RewardType } from "@/services/api";
+
+const REWARD_TYPE_LABELS: Record<RewardType, string> = {
+  free_item: "Free Item",
+  vip_experience: "VIP Experience",
+  secret_menu: "Secret Menu",
+};
 
 export default function RewardsPage() {
   const { user, loading: authLoading } = useAuth();
@@ -170,25 +177,21 @@ export default function RewardsPage() {
             <div>
               <p className="block text-sm font-medium text-gray-700 mb-2">Reward types</p>
               <div className="flex flex-wrap gap-2">
-                {[
-                  { id: "free_item", label: "Free Item" },
-                  { id: "vip_experience", label: "VIP Experience" },
-                  { id: "secret_menu", label: "Secret Menu" },
-                ].map((option) => {
-                  const isActive = selectedRewardTypes.includes(option.id as "free_item" | "vip_experience" | "secret_menu");
+                {REWARD_TYPES.map((type) => {
+                  const isActive = selectedRewardTypes.includes(type);
                   return (
                     <button
-                      key={option.id}
+                      key={type}
                       type="button"
                       aria-pressed={isActive}
-                      onClick={() => toggleRewardType(option.id as "free_item" | "vip_experience" | "secret_menu")}
+                      onClick={() => toggleRewardType(type)}
                       className={`rounded-full px-3 py-1.5 text-sm border transition ${
                         isActive
                           ? "bg-purple-600 text-white border-purple-600"
                           : "bg-white text-gray-700 border-gray-300 hover:border-purple-400"
                       }`}
                     >
-                      {option.label}
+                      {REWARD_TYPE_LABELS[type]}
                     </button>
                   );
                 })}

@@ -13,3 +13,8 @@ export function getCableConsumer(): Consumer {
   consumer = createConsumer(`${wsBase}/cable`);
   return consumer;
 }
+
+export function disconnectCableConsumer(): void {
+  consumer?.disconnect();
+  consumer = null;
+}

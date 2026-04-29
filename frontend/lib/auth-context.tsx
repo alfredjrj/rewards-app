@@ -6,10 +6,12 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   ReactNode,
 } from "react";
 import { User, getCurrentUser } from "@/services/api";
+import { disconnectCableConsumer } from "@/lib/cable";
 
 interface AuthContextValue {
   user: User | null;
@@ -29,6 +31,7 @@ const AuthContext = createContext<AuthContextValue>({
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const previousUserIdRef = useRef<number | null>(null);
 
   const refreshUser = useCallback(async () => {
     const profile = await getCurrentUser();
@@ -38,6 +41,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     refreshUser().catch(() => setUser(null)).finally(() => setLoading(false));
   }, [refreshUser]);
+
+  useEffect(() => {
+    const previousUserId = previousUserIdRef.current;
+    const currentUserId = user?.id ?? null;
+
+    // Reset Action Cable singleton whenever auth identity changes so new
+    // subscriptions use a fresh websocket handshake.
+    if (previousUserId !== null && previousUserId !== currentUserId) {
+      disconnectCableConsumer();
+    }
+
+    previousUserIdRef.current = currentUserId;
+  }, [user?.id]);
 
   const value = useMemo(
     () => ({ user, loading, setUser, refreshUser }),

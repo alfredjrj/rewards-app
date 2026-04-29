@@ -7,10 +7,16 @@ const { getCurrentUserMock, getUserPointsMock } = vi.hoisted(() => ({
   getCurrentUserMock: vi.fn(),
   getUserPointsMock: vi.fn(),
 }));
+const { disconnectCableConsumerMock } = vi.hoisted(() => ({
+  disconnectCableConsumerMock: vi.fn(),
+}));
 
 vi.mock("@/services/api", () => ({
   getCurrentUser: (...args: unknown[]) => getCurrentUserMock(...args),
   getUserPoints: (...args: unknown[]) => getUserPointsMock(...args),
+}));
+vi.mock("@/lib/cable", () => ({
+  disconnectCableConsumer: (...args: unknown[]) => disconnectCableConsumerMock(...args),
 }));
 
 function SessionProbe() {
@@ -67,5 +73,28 @@ describe("AuthProvider", () => {
     });
     expect(getCurrentUserMock).toHaveBeenCalledTimes(2);
     expect(getUserPointsMock).not.toHaveBeenCalled();
+  });
+
+  it("disconnects cable when identity switches users", async () => {
+    const user = userEvent.setup();
+    getCurrentUserMock
+      .mockResolvedValueOnce({ id: 1, email: "demo@example.com" })
+      .mockResolvedValueOnce({ id: 2, email: "other@example.com" });
+
+    render(
+      <AuthProvider>
+        <SessionProbe />
+      </AuthProvider>
+    );
+
+    await waitFor(() => expect(screen.getByTestId("email")).toHaveTextContent("demo@example.com"));
+    expect(disconnectCableConsumerMock).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "Refresh" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("email")).toHaveTextContent("other@example.com");
+    });
+    expect(disconnectCableConsumerMock).toHaveBeenCalledTimes(1);
   });
 });

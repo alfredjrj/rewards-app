@@ -38,12 +38,15 @@ export interface UserPointsPayload {
   points_available: number;
 }
 
+export const REWARD_TYPES = ["vip_experience", "free_item", "secret_menu"] as const;
+export type RewardType = (typeof REWARD_TYPES)[number];
+
 export interface Reward {
   id: number;
   title: string;
   description: string;
   points_cost: number;
-  reward_type: "vip_experience" | "free_item" | "secret_menu";
+  reward_type: RewardType;
   is_available: boolean;
 }
 

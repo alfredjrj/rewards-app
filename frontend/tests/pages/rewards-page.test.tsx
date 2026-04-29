@@ -38,6 +38,7 @@ vi.mock("@/lib/auth-context", () => ({
 }));
 
 vi.mock("@/services/api", () => ({
+  REWARD_TYPES: ["vip_experience", "free_item", "secret_menu"],
   fetchRewards: (...args: unknown[]) => fetchRewardsMock(...args),
   redeemReward: (...args: unknown[]) => redeemRewardMock(...args),
   getUserPoints: (...args: unknown[]) => getUserPointsMock(...args),

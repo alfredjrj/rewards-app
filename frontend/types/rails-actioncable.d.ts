@@ -1,5 +1,6 @@
 declare module "@rails/actioncable" {
   export interface Consumer {
+    disconnect: () => void;
     subscriptions: {
       create: (
         channel: unknown,

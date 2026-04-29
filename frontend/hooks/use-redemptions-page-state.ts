@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { getUserRedemptions, User } from "@/services/api";
+import { writeSearchScope } from "@/lib/search-scope";
 
 const PER_PAGE = 10;
 const SORT_OPTIONS = ["-created_at", "created_at", "-points_cost_snapshot", "points_cost_snapshot"] as const;
@@ -42,6 +43,10 @@ export function useRedemptionsPageState({ user, authLoading }: UseRedemptionsPag
       router.replace("/login");
     }
   }, [authLoading, user, router]);
+
+  useEffect(() => {
+    writeSearchScope("redemptions");
+  }, []);
 
   const rows = useMemo(
     () => (Array.isArray(redemptionsQuery.data?.data) ? redemptionsQuery.data.data : []),

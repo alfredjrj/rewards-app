@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
+import { disconnectCableConsumer } from "@/lib/cable";
 import { logout } from "@/services/api";
 
 export default function Navbar() {
@@ -13,6 +14,7 @@ export default function Navbar() {
     try {
       await logout();
     } finally {
+      disconnectCableConsumer();
       setUser(null);
       router.push("/login");
     }

@@ -7,6 +7,7 @@ import { fetchRewards, getRedemptionStatus, getUserPoints, redeemReward, Reward,
 import { User } from "@/services/api";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { getCableConsumer } from "@/lib/cable";
+import { readSearchScope, writeSearchScope } from "@/lib/search-scope";
 
 type RedemptionSuccessState = {
   rewardTitle: string;
@@ -95,6 +96,15 @@ export function useRewardsPageState({ user, authLoading }: UseRewardsPageStateAr
       router.replace("/login");
     }
   }, [user, authLoading, router]);
+
+  useEffect(() => {
+    const previousScope = readSearchScope();
+    if (previousScope && previousScope !== "rewards") {
+      setQuery("");
+      setPage(1);
+    }
+    writeSearchScope("rewards");
+  }, []);
 
   useEffect(() => {
     setPage(1);
