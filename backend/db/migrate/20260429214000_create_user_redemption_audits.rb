@@ -6,7 +6,7 @@ class CreateUserRedemptionAudits < ActiveRecord::Migration[8.0]
       t.references :reward, null: false, foreign_key: true, index: true
       t.references :point_transaction, foreign_key: { to_table: :user_point_transactions }, index: true
       t.string :request_id, null: false
-      t.string :change_source, null: false
+      t.string :change_source_origin, null: false
       t.string :change_reason, null: false
       t.jsonb :snapshot, null: false, default: {}
       t.jsonb :metadata, null: false, default: {}
@@ -19,7 +19,7 @@ class CreateUserRedemptionAudits < ActiveRecord::Migration[8.0]
     add_index :user_redemption_audits, [ :user_id, :created_at ]
     add_index :user_redemption_audits, [ :change_reason, :created_at ]
     add_check_constraint :user_redemption_audits, "char_length(request_id) > 0", name: "chk_user_redemption_audits_request_id_not_blank"
-    add_check_constraint :user_redemption_audits, "char_length(change_source) > 0", name: "chk_user_redemption_audits_change_source_not_blank"
+    add_check_constraint :user_redemption_audits, "char_length(change_source_origin) > 0", name: "chk_user_redemption_audits_change_source_origin_not_blank"
     add_check_constraint :user_redemption_audits, "char_length(change_reason) > 0", name: "chk_user_redemption_audits_change_reason_not_blank"
   end
 end

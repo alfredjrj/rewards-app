@@ -32,7 +32,14 @@ class Api::V1::User::RedemptionsController < AuthenticationController
     enqueue_result = User::Redemptions::PlaceCreditHoldAndEnqueue.call(
       user: current_user,
       reward: @reward,
-      idempotency_key: @idempotency_key
+      idempotency_key: @idempotency_key,
+      change_source_origin: "api_request",
+      change_source_metadata: {
+        "kind" => "http",
+        "path" => request.path,
+        "method" => request.method,
+        "request_uuid" => request.request_id
+      }.compact
     )
     unless enqueue_result.success?
       error_status = enqueue_result.error&.dig(:code) == "enqueue_unavailable" ? :service_unavailable : :unprocessable_entity
@@ -97,6 +104,7 @@ class Api::V1::User::RedemptionsController < AuthenticationController
   end
 
   private
+
   def redemption_params
     params.require(:redemption).permit(:reward_id)
   end

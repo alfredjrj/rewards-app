@@ -7,10 +7,12 @@ module User::Redemptions
       new(...).call
     end
 
-    def initialize(user:, reward:, idempotency_key:)
+    def initialize(user:, reward:, idempotency_key:, change_source_origin: "system", change_source_metadata: {})
       @user = user
       @reward = reward
       @idempotency_key = idempotency_key
+      @change_source_origin = change_source_origin
+      @change_source_metadata = change_source_metadata
     end
 
     def call
@@ -25,13 +27,19 @@ module User::Redemptions
       success(@created_redemption)
     rescue StandardError => e
       Rails.logger.warn(e.full_message)
-      @created_redemption&.update!(status: "failed")
+      if @created_redemption
+        @created_redemption.assign_change_source_origin(
+          change_source_origin: change_source_origin,
+          change_source_metadata: change_source_metadata.merge("failure" => "enqueue_unavailable")
+        )
+        @created_redemption.update!(status: "failed")
+      end
       enqueue_unavailable_failure(@created_redemption)
     end
 
     private
 
-    attr_reader :user, :reward, :idempotency_key
+    attr_reader :user, :reward, :idempotency_key, :change_source_origin, :change_source_metadata
 
     def reserve_processing_redemption
       user.with_lock do
@@ -48,12 +56,18 @@ module User::Redemptions
     end
 
     def create_processing_redemption
-      user.redemptions.create!(
+      redemption = user.redemptions.new(
         reward: reward,
         points_cost_snapshot: reward.points_cost,
         status: "processing",
         idempotency_key: idempotency_key
       )
+      redemption.assign_change_source_origin(
+        change_source_origin: change_source_origin,
+        change_source_metadata: change_source_metadata
+      )
+      redemption.save!
+      redemption
     end
 
     def sufficient_points_available?

@@ -20,7 +20,7 @@ RSpec.describe User::RedemptionAudit, type: :model do
         user: user,
         reward: reward,
         request_id: redemption.idempotency_key,
-        change_source: "model_callback",
+        change_source_origin: "api_request",
         change_reason: change_reason,
         snapshot: { status: redemption.status }
       )
@@ -29,19 +29,34 @@ RSpec.describe User::RedemptionAudit, type: :model do
     end
   end
 
-  it "rejects unknown change reasons" do
+  it "rejects change_reason values outside CHANGE_REASONS" do
     audit = described_class.new(
       redemption: redemption,
       user: user,
       reward: reward,
       request_id: redemption.idempotency_key,
-      change_source: "model_callback",
-      change_reason: "unknown",
+      change_source_origin: "api_request",
+      change_reason: "deleted",
       snapshot: { status: redemption.status }
     )
 
     expect(audit).not_to be_valid
     expect(audit.errors[:change_reason]).to include("is not included in the list")
+  end
+
+  it "rejects change_source_origin values outside CHANGE_SOURCES" do
+    audit = described_class.new(
+      redemption: redemption,
+      user: user,
+      reward: reward,
+      request_id: redemption.idempotency_key,
+      change_source_origin: "admin_console",
+      change_reason: "updated",
+      snapshot: { status: redemption.status }
+    )
+
+    expect(audit).not_to be_valid
+    expect(audit.errors[:change_source_origin]).to include("is not included in the list")
   end
 
   it "requires snapshot payload" do
@@ -50,7 +65,7 @@ RSpec.describe User::RedemptionAudit, type: :model do
       user: user,
       reward: reward,
       request_id: redemption.idempotency_key,
-      change_source: "model_callback",
+      change_source_origin: "api_request",
       change_reason: "updated",
       snapshot: nil
     )
@@ -65,7 +80,7 @@ RSpec.describe User::RedemptionAudit, type: :model do
       user: user,
       reward: reward,
       request_id: redemption.idempotency_key,
-      change_source: "model_callback",
+      change_source_origin: "background_job",
       change_reason: "updated",
       snapshot: { status: redemption.status },
       point_transaction: nil
@@ -74,19 +89,19 @@ RSpec.describe User::RedemptionAudit, type: :model do
     expect(audit).to be_valid
   end
 
-  it "requires change_source and request_id" do
+  it "requires change_source_origin and request_id" do
     audit = described_class.new(
       redemption: redemption,
       user: user,
       reward: reward,
       request_id: nil,
-      change_source: nil,
+      change_source_origin: nil,
       change_reason: "updated",
       snapshot: { status: redemption.status }
     )
 
     expect(audit).not_to be_valid
     expect(audit.errors[:request_id]).to include("can't be blank")
-    expect(audit.errors[:change_source]).to include("can't be blank")
+    expect(audit.errors[:change_source_origin]).to include("can't be blank")
   end
 end

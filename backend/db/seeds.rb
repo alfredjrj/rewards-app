@@ -294,50 +294,58 @@ user_redemptions_seed = [
 ]
 
 user_redemptions_seed.each do |attrs|
-  reward = Reward.find_by!(title: attrs[:reward_title])
-  redemption_key = "seed-user-redemption-#{attrs[:idempotency_key]}"
+    reward = Reward.find_by!(title: attrs[:reward_title])
+    redemption_key = "seed-user-redemption-#{attrs[:idempotency_key]}"
 
-  redemption = User::Redemption.find_or_initialize_by(user: user, idempotency_key: redemption_key)
-  redemption.update!(
-    reward: reward,
-    points_cost_snapshot: reward.points_cost,
-    status: "completed"
-  )
+    redemption = User::Redemption.find_or_initialize_by(user: user, idempotency_key: redemption_key)
+    redemption.assign_change_source_origin(
+      change_source_origin: "background_job",
+      change_source_metadata: { "source" => "db/seeds" }
+    )
+    redemption.update!(
+      reward: reward,
+      points_cost_snapshot: reward.points_cost,
+      status: "completed"
+    )
 
-  redeem_amount = -reward.points_cost
-  running_balance += redeem_amount
+    redeem_amount = -reward.points_cost
+    running_balance += redeem_amount
 
-  tx = User::PointTransaction.find_or_initialize_by(user: user, idempotency_key: attrs[:idempotency_key])
-  tx.update!(
-    amount: redeem_amount,
-    running_balance: running_balance,
-    kind: "redeem",
-    reason_code: "reward_redemption",
-    reason: "Redeemed #{reward.title}",
-    source: redemption
-  )
+    tx = User::PointTransaction.find_or_initialize_by(user: user, idempotency_key: attrs[:idempotency_key])
+    tx.update!(
+      amount: redeem_amount,
+      running_balance: running_balance,
+      kind: "redeem",
+      reason_code: "reward_redemption",
+      reason: "Redeemed #{reward.title}",
+      source: redemption
+    )
 
-  puts "Redemption seeded: #{redemption.id} #{reward.title} (balance: #{running_balance})"
-end
+    puts "Redemption seeded: #{redemption.id} #{reward.title} (balance: #{running_balance})"
+  end
 
-cancelled_redemptions_seed = [
-  { reward_title: "Lounge Access Day Pass", idempotency_key: "seed-redeem-cancelled-001" },
-  { reward_title: "VIP Event Seating", idempotency_key: "seed-redeem-cancelled-002" }
-]
+  cancelled_redemptions_seed = [
+    { reward_title: "Lounge Access Day Pass", idempotency_key: "seed-redeem-cancelled-001" },
+    { reward_title: "VIP Event Seating", idempotency_key: "seed-redeem-cancelled-002" }
+  ]
 
-cancelled_redemptions_seed.each do |attrs|
-  reward = Reward.find_by!(title: attrs[:reward_title])
-  redemption_key = "seed-user-redemption-#{attrs[:idempotency_key]}"
+  cancelled_redemptions_seed.each do |attrs|
+    reward = Reward.find_by!(title: attrs[:reward_title])
+    redemption_key = "seed-user-redemption-#{attrs[:idempotency_key]}"
 
-  redemption = User::Redemption.find_or_initialize_by(user: user, idempotency_key: redemption_key)
-  redemption.update!(
-    reward: reward,
-    points_cost_snapshot: reward.points_cost,
-    status: "cancelled"
-  )
+    redemption = User::Redemption.find_or_initialize_by(user: user, idempotency_key: redemption_key)
+    redemption.assign_change_source_origin(
+      change_source_origin: "background_job",
+      change_source_metadata: { "source" => "db/seeds" }
+    )
+    redemption.update!(
+      reward: reward,
+      points_cost_snapshot: reward.points_cost,
+      status: "cancelled"
+    )
 
-  puts "Redemption seeded: #{redemption.id} #{reward.title} (cancelled, no points deducted)"
-end
+    puts "Redemption seeded: #{redemption.id} #{reward.title} (cancelled, no points deducted)"
+  end
 
 puts "Final seeded points balance: #{running_balance}"
 puts "Seeding complete!"

@@ -43,7 +43,13 @@ RSpec.describe User::Redemptions::ProcessJob, type: :job do
       expect(User::Redemptions::Process).to have_received(:finalize_after_retries_exhausted).with(
         user_id: 1,
         reward_id: 2,
-        request_id: "req-1"
+        request_id: "req-1",
+        change_source_origin: "background_job",
+        change_source_metadata: {
+          "phase" => "retries_exhausted",
+          "request_id" => "req-1",
+          "sidekiq_jid" => "jid-1"
+        }
       )
       expect(Rails.logger).to have_received(:error).with(
         include("retries_exhausted jid=jid-1 user_id=1 reward_id=2 request_id=req-1 error=StandardError: boom")

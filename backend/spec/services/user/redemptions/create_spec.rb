@@ -107,6 +107,27 @@ RSpec.describe User::Redemptions::Create do
       expect(update_audit.point_transaction_id).to eq(debit.id)
     end
 
+    it "debits the reserved snapshot when reward points_cost changes after reservation" do
+      processing = create(
+        :user_redemption,
+        user: user,
+        reward: reward,
+        points_cost_snapshot: 100,
+        status: "processing",
+        idempotency_key: idempotency_key
+      )
+
+      reward.update!(points_cost: 999)
+
+      result = described_class.call(user: user, reward: reward, idempotency_key: idempotency_key)
+
+      expect(result.success?).to be(true)
+      expect(processing.reload.points_cost_snapshot).to eq(100)
+      debit = user.point_transactions.order(:id).last
+      expect(debit.amount).to eq(-100)
+      expect(result.points_balance).to eq(400)
+    end
+
     it "does not resurrect a failed redemption on replay with same idempotency key" do
       failed_redemption = create(
         :user_redemption,

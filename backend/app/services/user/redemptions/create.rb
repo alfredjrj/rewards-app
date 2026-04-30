@@ -1,6 +1,10 @@
 module User::Redemptions
   # Completes a reserved redemption by debiting points and marking it completed.
   # Supports idempotent replay and terminal-state short-circuiting.
+  #
+  # `points_cost_snapshot` is set at reservation (or on first create) and is never
+  # overwritten here if the reward is repriced before the job runs — the debit uses
+  # the snapshot, not `reward.points_cost`.
   class Create
     TERMINAL_STATUSES = %w[completed failed cancelled].freeze
     Result = Struct.new(:success?, :redemption, :points_balance, :point_transaction, :error, keyword_init: true)
@@ -9,10 +13,12 @@ module User::Redemptions
       new(...).call
     end
 
-    def initialize(user:, reward:, idempotency_key:)
+    def initialize(user:, reward:, idempotency_key:, change_source_origin: "system", change_source_metadata: {})
       @user = user
       @reward = reward
       @idempotency_key = idempotency_key
+      @change_source_origin = change_source_origin
+      @change_source_metadata = change_source_metadata
     end
 
     def call
@@ -41,7 +47,7 @@ module User::Redemptions
 
     private
 
-    attr_reader :user, :reward, :idempotency_key
+    attr_reader :user, :reward, :idempotency_key, :change_source_origin, :change_source_metadata
 
     def find_existing_redemption
       user.redemptions.find_by(idempotency_key: idempotency_key)
@@ -67,7 +73,13 @@ module User::Redemptions
     def complete_redemption!(redemption)
       points_result = nil
 
-      ActiveRecord::Base.transaction do
+      redemption.assign_change_source_origin(
+        change_source_origin: change_source_origin,
+        change_source_metadata: change_source_metadata
+      )
+
+      # Nested transaction so per-save audit callbacks run when an outer spec/job has an open transaction.
+      ActiveRecord::Base.transaction(requires_new: true) do
         persist_redemption_snapshot!(redemption)
         points_result = create_points_debit_for(redemption)
         raise ActiveRecord::Rollback unless points_result.success?
@@ -79,17 +91,21 @@ module User::Redemptions
     end
 
     def persist_redemption_snapshot!(redemption)
+      return unless redemption.new_record?
+
       redemption.assign_attributes(
         reward: reward,
-        points_cost_snapshot: reward.points_cost
+        points_cost_snapshot: reward.points_cost,
+        # Avoid DB default `completed` so the completion step is a real update (audit + ledger semantics).
+        status: "processing"
       )
-      redemption.save! if redemption.new_record?
+      redemption.save!
     end
 
     def create_points_debit_for(redemption)
       User::PointTransactions::Create.call(
         user: user,
-        amount: -reward.points_cost,
+        amount: -redemption.points_cost_snapshot,
         kind: "redeem",
         reason_code: "reward_redemption",
         idempotency_key: idempotency_key,
@@ -99,11 +115,7 @@ module User::Redemptions
     end
 
     def mark_redemption_completed!(redemption)
-      redemption.update!(
-        reward: reward,
-        points_cost_snapshot: reward.points_cost,
-        status: "completed"
-      )
+      redemption.update!(status: "completed")
     end
 
     def current_points_balance

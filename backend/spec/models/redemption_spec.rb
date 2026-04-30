@@ -29,6 +29,15 @@ RSpec.describe User::Redemption, type: :model do
     expect(duplicate.errors[:idempotency_key]).to include("has already been taken")
   end
 
+  it "prevents destroy while an audit trail exists" do
+    redemption = create(:user_redemption)
+
+    expect(redemption.destroy).to be(false)
+    expect(redemption.errors[:base]).to include(
+      "Cannot delete record because dependent audits exist"
+    )
+  end
+
   describe "audit snapshots" do
     it "creates a created audit row on insert" do
       redemption = create(:user_redemption, status: "processing")

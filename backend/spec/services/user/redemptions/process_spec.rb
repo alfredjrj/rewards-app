@@ -27,7 +27,9 @@ RSpec.describe User::Redemptions::Process do
       expect(User::Redemptions::Create).to have_received(:call).with(
         user: user,
         reward: reward,
-        idempotency_key: key
+        idempotency_key: key,
+        change_source_origin: "background_job",
+        change_source_metadata: {}
       )
       expect(ActionCable.server).to have_received(:broadcast).with(
         "user_redemptions:#{user.id}",

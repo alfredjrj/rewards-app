@@ -57,7 +57,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_04_29_214000) do
     t.bigint "reward_id", null: false
     t.bigint "point_transaction_id"
     t.string "request_id", null: false
-    t.string "change_source", null: false
+    t.string "change_source_origin", null: false
     t.string "change_reason", null: false
     t.jsonb "snapshot", default: {}, null: false
     t.jsonb "metadata", default: {}, null: false
@@ -72,7 +72,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_04_29_214000) do
     t.index ["user_redemption_id", "created_at"], name: "idx_on_user_redemption_id_created_at_14c1a4ca51"
     t.index ["user_redemption_id"], name: "index_user_redemption_audits_on_user_redemption_id"
     t.check_constraint "char_length(change_reason::text) > 0", name: "chk_user_redemption_audits_change_reason_not_blank"
-    t.check_constraint "char_length(change_source::text) > 0", name: "chk_user_redemption_audits_change_source_not_blank"
+    t.check_constraint "char_length(change_source_origin::text) > 0", name: "chk_user_redemption_audits_change_source_origin_not_blank"
     t.check_constraint "char_length(request_id::text) > 0", name: "chk_user_redemption_audits_request_id_not_blank"
   end
 

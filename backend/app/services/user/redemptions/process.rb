@@ -13,16 +13,31 @@ module User::Redemptions
 
     RETRYABLE_SERVICE_ERROR_CODES = %w[internal_error].freeze
 
-    def self.call(user_id:, reward_id:, request_id:, job_id: nil)
-      new(user_id: user_id, reward_id: reward_id, request_id: request_id, job_id: job_id).call
+    def self.call(user_id:, reward_id:, request_id:, job_id: nil, change_source_origin: "background_job", change_source_metadata: {})
+      new(
+        user_id: user_id,
+        reward_id: reward_id,
+        request_id: request_id,
+        job_id: job_id,
+        change_source_origin: change_source_origin,
+        change_source_metadata: change_source_metadata
+      ).call
     end
 
-    def self.finalize_after_retries_exhausted(user_id:, reward_id:, request_id:)
+    def self.finalize_after_retries_exhausted(
+      user_id:,
+      reward_id:,
+      request_id:,
+      change_source_origin: "background_job",
+      change_source_metadata: {}
+    )
       return if user_id.blank? || request_id.blank?
       updated = User::Redemptions::StatusTransition.mark(
         user_id: user_id,
         request_id: request_id,
-        status: "failed"
+        status: "failed",
+        change_source_origin: change_source_origin,
+        change_source_metadata: change_source_metadata
       )
       return unless updated
 
@@ -38,11 +53,13 @@ module User::Redemptions
       StatusPublisher.publish(user_id: user_id, request_id: request_id, payload: payload)
     end
 
-    def initialize(user_id:, reward_id:, request_id:, job_id:)
+    def initialize(user_id:, reward_id:, request_id:, job_id:, change_source_origin: "background_job", change_source_metadata: {})
       @user_id = user_id
       @reward_id = reward_id
       @request_id = request_id
       @job_id = job_id
+      @change_source_origin = change_source_origin
+      @change_source_metadata = change_source_metadata
     end
 
     def call
@@ -55,7 +72,9 @@ module User::Redemptions
         result = User::Redemptions::Create.call(
           user: user,
           reward: reward,
-          idempotency_key: request_id
+          idempotency_key: request_id,
+          change_source_origin: change_source_origin,
+          change_source_metadata: change_source_metadata
         )
 
         return handle_create_success(user, reward, result) if result.success?
@@ -70,7 +89,7 @@ module User::Redemptions
     end
 
     private
-    attr_reader :user_id, :reward_id, :request_id, :job_id
+    attr_reader :user_id, :reward_id, :request_id, :job_id, :change_source_origin, :change_source_metadata
 
     def handle_create_success(user, reward, result)
       publish_status(
@@ -85,13 +104,25 @@ module User::Redemptions
     def handle_create_failure(user, reward, result)
       raise TransientFailure, "Transient redemption processing failure" if retryable_service_error?(result.error)
 
-      User::Redemptions::StatusTransition.mark(user_id: user.id, request_id: request_id, status: "failed")
+      User::Redemptions::StatusTransition.mark(
+        user_id: user.id,
+        request_id: request_id,
+        status: "failed",
+        change_source_origin: change_source_origin,
+        change_source_metadata: change_source_metadata
+      )
       publish_status(user_id: user.id, reward_id: reward.id, status: "failed", error: result.error)
       log :warn, "failed", user_id: user.id, reward_id: reward.id, error: result.error&.dig(:code)
     end
 
     def handle_record_not_found(exception)
-      User::Redemptions::StatusTransition.mark(user_id: user_id, request_id: request_id, status: "failed")
+      User::Redemptions::StatusTransition.mark(
+        user_id: user_id,
+        request_id: request_id,
+        status: "failed",
+        change_source_origin: change_source_origin,
+        change_source_metadata: change_source_metadata
+      )
       publish_status(
         user_id: user_id,
         reward_id: reward_id,

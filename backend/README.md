@@ -99,10 +99,12 @@ The worker completes phase two asynchronously:
 
 Redemption lifecycle auditing is snapshot-based:
 
-- each persisted redemption change writes one `User::RedemptionAudit` row
+- `User::Redemption` uses `after_create` / `after_update` to append one `User::RedemptionAudit` row per save (via `User::Redemptions::Audit` only)
+- **Provenance** is explicit: call `redemption.assign_change_source_origin(change_source_origin:, change_source_metadata:)` before saves that record audits, or pass the same keywords into services (`PlaceCreditHoldAndEnqueue`, `Process`, `StatusTransition`, `Create`). The API create action uses `api_request` with request metadata; `ProcessJob` uses `background_job` with Sidekiq/request ids; seeds use `background_job` with `source: db/seeds`. If unset, audits fall back to `system` (internal / unspecified caller). The column is `user_redemption_audits.change_source_origin`, matching in-memory `User::Redemption#change_source_origin`.
 - each row stores a single `snapshot` JSON (the state after that change)
 - previous state is derived from the prior row for the same `user_redemption_id`
 - `point_transaction_id` is optional and linked when a related ledger row exists
+- failed audit inserts are logged and do not roll back the redemption row (`Audit.record` rescues persist errors)
 
 This keeps the model simple while preserving full history of object evolution.
 
@@ -136,7 +138,7 @@ When debugging or auditing a redemption:
 Typical query:
 
 ```sql
-SELECT created_at, change_reason, change_source, snapshot, point_transaction_id
+SELECT created_at, change_reason, change_source_origin, snapshot, point_transaction_id
 FROM user_redemption_audits
 WHERE user_redemption_id = :redemption_id
 ORDER BY created_at ASC, id ASC;
