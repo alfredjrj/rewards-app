@@ -4,6 +4,11 @@ module User::Redemptions
   # It reserves a processing redemption (credit hold semantics) and enqueues async
   # finalization exactly once per idempotency key.
   class PlaceCreditHoldAndReserve
+    ENQUEUE_TRANSIENT_EXCEPTIONS = [
+      (Redis::BaseConnectionError if defined?(Redis::BaseConnectionError)),
+      (Sidekiq::Shutdown if defined?(Sidekiq::Shutdown))
+    ].compact.freeze
+
     Result = Struct.new(:success?, :error, :redemption, :reserved_new?, keyword_init: true)
 
     def self.call(...)
@@ -32,6 +37,8 @@ module User::Redemptions
         reserve_result
       end
     rescue StandardError => e
+      raise unless enqueue_transient_error?(e)
+
       Rails.logger.warn(e.full_message)
       mark_failed(
         @redemption,
@@ -77,7 +84,7 @@ module User::Redemptions
         idempotency_key: idempotency_key
       )
       redemption.save!
-      User::Redemptions::Audit.record_async(
+      User::Redemptions::AuditAsync.call(
         redemption: redemption,
         change_reason: "created",
         change_source_origin: change_source_origin,
@@ -95,7 +102,7 @@ module User::Redemptions
       if redemption
         transitioned = redemption.fail!
         if transitioned
-          User::Redemptions::Audit.record_async(
+          User::Redemptions::AuditAsync.call(
             redemption: redemption,
             change_reason: "updated",
             change_source_origin: change_source_origin,
@@ -134,6 +141,10 @@ module User::Redemptions
         code: "insufficient_balance",
         message: "Insufficient points balance"
       )
+    end
+
+    def enqueue_transient_error?(exception)
+      ENQUEUE_TRANSIENT_EXCEPTIONS.any? { |klass| exception.is_a?(klass) }
     end
   end
 end

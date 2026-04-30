@@ -14,7 +14,7 @@ module User::Redemptions
       return false unless redemption.public_send("may_#{event}?")
 
       redemption.public_send("#{event}!")
-      User::Redemptions::Audit.record_async(
+      User::Redemptions::AuditAsync.call(
         redemption: redemption,
         change_reason: "updated",
         change_source_origin: change_source_origin,

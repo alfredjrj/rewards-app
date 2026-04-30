@@ -13,7 +13,7 @@ RSpec.describe User::Redemptions::AuditJob, type: :job do
         "event_at" => Time.current.iso8601(6),
         "change_source_origin" => "background_job",
         "change_reason" => "updated",
-        "snapshot" => User::Redemptions::Audit.snapshot_for(redemption),
+        "snapshot" => User::Redemptions::AuditAsync.snapshot_for(redemption),
         "metadata" => { "phase" => "job" }
       }
 

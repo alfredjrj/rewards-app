@@ -1,7 +1,7 @@
 require "rails_helper"
 
-RSpec.describe User::Redemptions::Audit do
-  describe ".record_async" do
+RSpec.describe User::Redemptions::AuditAsync do
+  describe ".call" do
     let(:user) { create(:user) }
     let(:reward) { create(:reward) }
     let(:redemption) do
@@ -22,7 +22,7 @@ RSpec.describe User::Redemptions::Audit do
     end
 
     it "uses explicit change_source_origin and persists provided metadata" do
-      payload = described_class.record_async(
+      payload = described_class.call(
         redemption: redemption,
         change_reason: "updated",
         change_source_origin: "background_job",
@@ -42,7 +42,7 @@ RSpec.describe User::Redemptions::Audit do
     end
 
     it "falls back to system when origin is omitted" do
-      payload = described_class.record_async(
+      payload = described_class.call(
         redemption: redemption,
         change_reason: "updated"
       )
@@ -58,7 +58,7 @@ RSpec.describe User::Redemptions::Audit do
       allow(Rails.logger).to receive(:error)
       allow(User::Redemptions::AuditJob).to receive(:perform_async).and_raise(StandardError, "redis down")
 
-      payload = described_class.record_async(
+      payload = described_class.call(
         redemption: redemption,
         change_reason: "invalid_reason",
         change_source_origin: "api_request"

@@ -327,7 +327,7 @@ user_redemptions_seed.each do |attrs|
       points_cost_snapshot: reward.points_cost,
       status: "completed"
     )
-    User::Redemptions::Audit.record_async(
+    User::Redemptions::AuditAsync.call(
       redemption: redemption,
       change_reason: was_new ? "created" : "updated",
       change_source_origin: "system",
@@ -371,7 +371,7 @@ user_redemptions_seed.each do |attrs|
       points_cost_snapshot: reward.points_cost,
       status: "cancelled"
     )
-    User::Redemptions::Audit.record_async(
+    User::Redemptions::AuditAsync.call(
       redemption: redemption,
       change_reason: was_new ? "created" : "updated",
       change_source_origin: "system",

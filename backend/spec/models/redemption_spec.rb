@@ -38,7 +38,7 @@ RSpec.describe User::Redemption, type: :model do
 
   it "prevents destroy while an audit trail exists" do
     redemption = create(:user_redemption)
-    User::Redemptions::Audit.record_async(
+    User::Redemptions::AuditAsync.call(
       redemption: redemption,
       change_reason: "created",
       change_source_origin: "system"

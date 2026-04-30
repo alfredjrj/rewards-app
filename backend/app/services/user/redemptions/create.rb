@@ -149,7 +149,7 @@ module User::Redemptions
     end
 
     def record_audit_for(redemption, change_reason:, point_transaction: nil)
-      User::Redemptions::Audit.record_async(
+      User::Redemptions::AuditAsync.call(
         redemption: redemption,
         change_reason: change_reason,
         change_source_origin: change_source_origin,

@@ -80,7 +80,7 @@ RSpec.describe User::Redemptions::PlaceCreditHoldAndReserve do
     end
 
     it "returns enqueue_unavailable and marks row failed when enqueue fails" do
-      allow(User::Redemptions::ProcessJob).to receive(:perform_in).and_raise(StandardError, "redis down")
+      allow(User::Redemptions::ProcessJob).to receive(:perform_in).and_raise(Redis::BaseConnectionError, "redis down")
 
       result = described_class.call(user: user, reward: reward, idempotency_key: idempotency_key)
 
@@ -98,7 +98,7 @@ RSpec.describe User::Redemptions::PlaceCreditHoldAndReserve do
     end
 
     it "does not queue updated audit when transition to failed is rejected" do
-      allow(User::Redemptions::ProcessJob).to receive(:perform_in).and_raise(StandardError, "redis down")
+      allow(User::Redemptions::ProcessJob).to receive(:perform_in).and_raise(Redis::BaseConnectionError, "redis down")
       allow(Rails.logger).to receive(:error)
       allow_any_instance_of(User::Redemption).to receive(:fail!).and_return(false)
 
@@ -110,6 +110,14 @@ RSpec.describe User::Redemptions::PlaceCreditHoldAndReserve do
       expect(redemption.status).to eq("processing")
       expect(redemption.audits.pluck(:change_reason)).to eq([ "created" ])
       expect(Rails.logger).to have_received(:error).with(include("[redemption.place_credit_hold_and_reserve] transition_failed"))
+    end
+
+    it "re-raises unexpected enqueue errors instead of masking them as queue outages" do
+      allow(User::Redemptions::ProcessJob).to receive(:perform_in).and_raise(NoMethodError, "boom")
+
+      expect do
+        described_class.call(user: user, reward: reward, idempotency_key: idempotency_key)
+      end.to raise_error(NoMethodError, "boom")
     end
 
     it "creates exactly one processing redemption under concurrent calls with same idempotency key", :concurrency do

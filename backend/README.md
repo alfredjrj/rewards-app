@@ -145,12 +145,18 @@ This keeps accounting deterministic and auditable.
 
 ### 5) Audit snapshot lifecycle
 
-Audit writes are explicit and asynchronous (always via `User::Redemptions::Audit.record_async`):
+Audit writes are explicit and asynchronous (always via `User::Redemptions::AuditAsync.call`):
 
-1. Services call `User::Redemptions::Audit.record_async(...)` right after redemption state changes.
-2. `Audit.record_async` builds payload with provenance (`change_source_origin`, `change_source_metadata`) and `event_at`.
+1. Services call `User::Redemptions::AuditAsync.call(...)` right after redemption state changes.
+2. `AuditAsync.call` builds payload with provenance (`change_source_origin`, `change_source_metadata`) and `event_at`.
 3. Payload is enqueued to `User::Redemptions::AuditJob` after DB commit.
 4. Job inserts `user_redemption_audits` row with one `snapshot` JSON.
+
+Redis durability mode (why no outbox):
+- This backend expects Redis to run in durable AOF mode for Sidekiq queue persistence.
+- Once an audit job is accepted by Redis, durability covers restart/crash retention.
+- Enqueue-time failures (before Redis accepts) are handled by inline audit persistence fallback.
+- Given those guarantees, we intentionally do not add a separate DB outbox + poller for audit events.
 
 `event_at` preserves event order even if Sidekiq persistence order differs.
 For reconstruction, order by `event_at`, then `id`.
