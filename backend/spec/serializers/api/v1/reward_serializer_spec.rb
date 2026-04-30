@@ -20,6 +20,7 @@ RSpec.describe Api::V1::RewardSerializer do
         description: "Fresh brew",
         points_cost: 100,
         reward_type: "free_item",
+        fulfillment_provider: reward.fulfillment_provider,
         is_available: true
       }
     )
@@ -40,6 +41,7 @@ RSpec.describe Api::V1::RewardSerializer do
             description: first.description,
             points_cost: 100,
             reward_type: "free_item",
+            fulfillment_provider: first.fulfillment_provider,
             is_available: first.is_available
           },
           {
@@ -48,6 +50,7 @@ RSpec.describe Api::V1::RewardSerializer do
             description: second.description,
             points_cost: 300,
             reward_type: "vip_experience",
+            fulfillment_provider: second.fulfillment_provider,
             is_available: second.is_available
           }
         ]

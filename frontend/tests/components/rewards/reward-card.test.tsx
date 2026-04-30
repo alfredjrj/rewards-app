@@ -10,6 +10,7 @@ describe("RewardCard", () => {
     description: "Redeem for one free coffee.",
     points_cost: 100,
     reward_type: "free_item" as const,
+    fulfillment_provider: "internal",
     is_available: true,
   };
 
@@ -36,5 +37,18 @@ describe("RewardCard", () => {
     expect(button).toBeDisabled();
     await user.click(button);
     expect(onRedeem).not.toHaveBeenCalled();
+  });
+
+  it("shows external provider badge for externally fulfilled rewards", () => {
+    render(
+      <RewardCard
+        reward={{ ...reward, fulfillment_provider: "ticketmaster" }}
+        redeeming={false}
+        canRedeem
+        onRedeem={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText("External provider: Ticketmaster")).toBeInTheDocument();
   });
 });

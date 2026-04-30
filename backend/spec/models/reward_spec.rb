@@ -54,5 +54,20 @@ RSpec.describe Reward, type: :model do
       expect(reward).not_to be_valid
       expect(reward.errors[:reward_type]).to include("is not included in the list")
     end
+
+    it "requires a fulfillment_provider" do
+      reward = build(:reward, fulfillment_provider: nil)
+
+      expect(reward).not_to be_valid
+      expect(reward.errors[:fulfillment_provider]).to include("can't be blank")
+    end
+
+    it "only allows supported fulfillment providers" do
+      reward = build(:reward, fulfillment_provider: "unknown_vendor")
+
+      expect(reward).not_to be_valid
+      expect(reward.errors[:fulfillment_provider]).to include("is not included in the list")
+    end
+
   end
 end

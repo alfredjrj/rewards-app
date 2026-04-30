@@ -7,6 +7,7 @@ class Api::V1::RewardSerializer
         description: reward.description,
         points_cost: reward.points_cost,
         reward_type: reward.reward_type,
+        fulfillment_provider: reward.fulfillment_provider,
         is_available: reward.is_available
       }
     }

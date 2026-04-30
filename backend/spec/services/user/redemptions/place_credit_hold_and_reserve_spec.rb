@@ -1,9 +1,17 @@
 require "rails_helper"
 
-RSpec.describe User::Redemptions::PlaceCreditHoldAndEnqueue do
+RSpec.describe User::Redemptions::PlaceCreditHoldAndReserve do
   describe ".call" do
     let(:user) { create(:user) }
-    let(:reward) { create(:reward, points_cost: 100, is_available: true) }
+    let(:reward) do
+      create(
+        :reward,
+        points_cost: 100,
+        is_available: true,
+        reward_type: "vip_experience",
+        fulfillment_provider: "ticketmaster"
+      )
+    end
     let(:idempotency_key) { "4feb0ed2-c6ca-466a-aea0-d3b9f8e54311" }
 
     before do
@@ -39,7 +47,7 @@ RSpec.describe User::Redemptions::PlaceCreditHoldAndEnqueue do
     end
 
     it "returns insufficient balance error when user cannot afford reward" do
-      expensive_reward = create(:reward, points_cost: 999, is_available: true)
+      expensive_reward = create(:reward, points_cost: 999, is_available: true, fulfillment_provider: "ticketmaster")
       allow(User::Redemptions::ProcessJob).to receive(:perform_in)
 
       result = described_class.call(user: user, reward: expensive_reward, idempotency_key: idempotency_key)
@@ -101,7 +109,7 @@ RSpec.describe User::Redemptions::PlaceCreditHoldAndEnqueue do
       expect(redemption).to be_present
       expect(redemption.status).to eq("processing")
       expect(redemption.audits.pluck(:change_reason)).to eq([ "created" ])
-      expect(Rails.logger).to have_received(:error).with(include("[redemption.place_hold] transition_failed"))
+      expect(Rails.logger).to have_received(:error).with(include("[redemption.place_credit_hold_and_reserve] transition_failed"))
     end
 
     it "creates exactly one processing redemption under concurrent calls with same idempotency key", :concurrency do

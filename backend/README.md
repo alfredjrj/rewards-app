@@ -65,9 +65,12 @@ This service owns:
   - `User::RedemptionAudit` stores change-by-change snapshots of `User::Redemption` for operational history.
   - Audit rows keep references (`user_redemption_id`, optional `point_transaction_id`) so snapshot history can be joined to ledger facts.
 - **Idempotent redemptions**: `Idempotency-Key` is required on create redemption requests.
-- **Two-phase redemption**:
-  1. reserve a `processing` redemption (`PlaceCreditHoldAndEnqueue`)
-  2. finalize asynchronously (`ProcessJob` -> `Process`)
+- **Provider-driven fulfillment paths**:
+  - `internal` provider finalizes inline in API request
+  - external providers (for example `ticketmaster`) reserve `processing` rows and finalize in Sidekiq
+- **Provider-based entry branching**:
+  1. `internal` provider finalizes inline (`User::Redemptions::Create`) with no pending hold
+  2. external providers use `User::Redemptions::PlaceCreditHoldAndReserve` to reserve + enqueue async processing
 - **Availability during processing**: available points are computed as balance minus `processing` holds in one SQL snapshot.
 
 ## API (v1)
@@ -90,19 +93,21 @@ This system is intentionally split into:
 
 1. Validate `Idempotency-Key`.
 2. If key already exists for the user, replay the existing request state (no duplicate write).
-3. If key is new, run `User::Redemptions::PlaceCreditHoldAndEnqueue`:
-   - create a `user_redemptions` row with status `processing` (credit hold)
-   - enqueue `User::Redemptions::ProcessJob`
-   - write the corresponding audit snapshot for the hold
-4. Return immediately:
-   - `202 Accepted` when still `processing`
-   - `200 OK` for replayed terminal result
+3. If key is new, branch by provider:
+   - external providers run `User::Redemptions::PlaceCreditHoldAndReserve`:
+     - create a `user_redemptions` row with status `processing` (credit hold)
+     - queue an audit payload for the hold (persisted asynchronously by `AuditJob`)
+     - enqueue `User::Redemptions::ProcessJob` and return `202 Accepted` (`processing`)
+   - `internal` provider finalizes inline (`User::Redemptions::Create`) and returns `200 OK` (`completed` or failure), with audit persistence still queued async
+4. Replayed terminal requests still return `200 OK`.
 
-At this stage, no points are debited yet.
+At this stage:
+- external flow has a pending hold and no debit yet
+- internal flow is already finalized and debited
 
 ### 2) Async processor finalizes redemption
 
-`User::Redemptions::ProcessJob` runs `User::Redemptions::Process`, which calls `User::Redemptions::Create`.
+`User::Redemptions::ProcessJob` runs `User::Redemptions::Process`, which calls `User::Redemptions::CreateWithReservation`.
 
 Inside the finalize transaction:
 
@@ -140,10 +145,10 @@ This keeps accounting deterministic and auditable.
 
 ### 5) Audit snapshot lifecycle
 
-Audit writes are explicit and asynchronous:
+Audit writes are explicit and asynchronous (always via `User::Redemptions::Audit.record_async`):
 
-1. Services call `User::Redemptions::Audit.record(...)` right after redemption state changes.
-2. `Audit.record` builds payload with provenance (`change_source_origin`, `change_source_metadata`) and `event_at`.
+1. Services call `User::Redemptions::Audit.record_async(...)` right after redemption state changes.
+2. `Audit.record_async` builds payload with provenance (`change_source_origin`, `change_source_metadata`) and `event_at`.
 3. Payload is enqueued to `User::Redemptions::AuditJob` after DB commit.
 4. Job inserts `user_redemption_audits` row with one `snapshot` JSON.
 

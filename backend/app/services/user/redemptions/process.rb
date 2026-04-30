@@ -1,6 +1,6 @@
 module User::Redemptions
-  # Runs async redemption after reservation: Create + publish status for polling/cable.
-  # Raises TransientFailure when Sidekiq should retry (infra or internal_error from Create).
+  # Runs async redemption after reservation: CreateWithReservation + publish status for polling/cable.
+  # Raises TransientFailure when Sidekiq should retry (infra or internal_error from CreateWithReservation).
   class Process
     TransientFailure = Class.new(StandardError)
 
@@ -69,7 +69,7 @@ module User::Redemptions
         user = User.find(user_id)
         reward = Reward.find(reward_id)
 
-        result = User::Redemptions::Create.call(
+        result = User::Redemptions::CreateWithReservation.call(
           user: user,
           reward: reward,
           idempotency_key: request_id,
@@ -104,35 +104,17 @@ module User::Redemptions
     def handle_create_failure(user, reward, result)
       raise TransientFailure, "Transient redemption processing failure" if retryable_service_error?(result.error)
 
-      User::Redemptions::StatusTransition.mark(
-        user_id: user.id,
-        request_id: request_id,
-        status: "failed",
-        change_source_origin: change_source_origin,
-        change_source_metadata: change_source_metadata
-      )
-      publish_status(user_id: user.id, reward_id: reward.id, status: "failed", error: result.error)
+      mark_failed_and_publish(user_id: user.id, reward_id: reward.id, error: result.error)
       log :warn, "failed", user_id: user.id, reward_id: reward.id, error: result.error&.dig(:code)
     end
 
     def handle_record_not_found(exception)
-      User::Redemptions::StatusTransition.mark(
-        user_id: user_id,
-        request_id: request_id,
-        status: "failed",
-        change_source_origin: change_source_origin,
-        change_source_metadata: change_source_metadata
-      )
-      publish_status(
-        user_id: user_id,
-        reward_id: reward_id,
-        status: "failed",
-        error: {
-          code: "not_found",
-          message: "User or reward was removed before redemption could finish",
-          details: { model: exception.model }
-        }.compact
-      )
+      error = {
+        code: "not_found",
+        message: "User or reward was removed before redemption could finish",
+        details: { model: exception.model }
+      }.compact
+      mark_failed_and_publish(user_id: user_id, reward_id: reward_id, error: error)
       log :warn, "not_found", user_id: nil, reward_id: nil, error: exception.message
     end
 
@@ -151,6 +133,17 @@ module User::Redemptions
         error: error
       }.compact
       StatusPublisher.publish(user_id: user_id, request_id: request_id, payload: payload)
+    end
+
+    def mark_failed_and_publish(user_id:, reward_id:, error:)
+      User::Redemptions::StatusTransition.mark(
+        user_id: user_id,
+        request_id: request_id,
+        status: "failed",
+        change_source_origin: change_source_origin,
+        change_source_metadata: change_source_metadata
+      )
+      publish_status(user_id: user_id, reward_id: reward_id, status: "failed", error: error)
     end
 
     def retryable_service_error?(error)

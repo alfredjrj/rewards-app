@@ -2,6 +2,7 @@ class User::Redemption < ApplicationRecord
   include AASM
 
   STATUSES = %w[processing completed failed cancelled].freeze
+  TERMINAL_STATUSES = %w[completed failed cancelled].freeze
 
   belongs_to :user
   belongs_to :reward

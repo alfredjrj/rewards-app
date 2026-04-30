@@ -7,9 +7,10 @@ module User::Redemptions
   # Provenance is explicit at each call site via `change_source_origin` / `change_source_metadata`.
   # Callers should pass values from the current execution context (api request, background job, seeds, etc).
   class Audit
-    # Queue audit persistence so redemptions can still process if audit insertion fails transiently.
+    # ASYNC: queues audit persistence via Sidekiq (does not write DB rows inline).
+    # Redemptions can still process if audit insertion fails transiently.
     # If the job exhausts retries, we log payload details so compliance reconciliation can run later.
-    def self.record(
+    def self.record_async(
       redemption:,
       change_reason:,
       change_source_origin: "system",

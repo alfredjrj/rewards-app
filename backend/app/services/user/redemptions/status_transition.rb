@@ -1,6 +1,5 @@
 module User::Redemptions
   class StatusTransition
-    TERMINAL_STATUSES = %w[completed failed cancelled].freeze
     STATUS_EVENTS = {
       "completed" => :complete,
       "failed" => :fail,
@@ -15,7 +14,7 @@ module User::Redemptions
       return false unless redemption.public_send("may_#{event}?")
 
       redemption.public_send("#{event}!")
-      User::Redemptions::Audit.record(
+      User::Redemptions::Audit.record_async(
         redemption: redemption,
         change_reason: "updated",
         change_source_origin: change_source_origin,

@@ -17,6 +17,7 @@ export interface Reward {
   description: string;
   points_cost: number;
   reward_type: RewardType;
+  fulfillment_provider?: string;
   is_available: boolean;
 }
 

@@ -176,7 +176,8 @@ export function useRewardsPageState({ user, authLoading }: UseRewardsPageStateAr
     setRedeemError("");
     try {
       const payload = await redeemMutation.mutateAsync({ rewardId: reward.id, idempotencyKey });
-      if (payload.data.status === "processing") {
+      const status = payload.data.status;
+      if (status === "processing") {
         const requestId = payload.data.request_id;
         if (requestId) {
           addProcessingRequest({
@@ -186,15 +187,18 @@ export function useRewardsPageState({ user, authLoading }: UseRewardsPageStateAr
           });
         }
         await queryClient.invalidateQueries({ queryKey: pointsQueryKey });
-      } else {
+      } else if (status === "completed") {
         const updatedPointsBalance =
-          payload.data.status === "completed" ? (payload.data.points_balance ?? pointsBalance) : pointsBalance;
+          payload.data.points_balance ?? pointsBalance;
         addRedemptionSuccess({
           id: idempotencyKey,
           rewardTitle: reward.title,
           pointsSpent: reward.points_cost,
           pointsBalance: updatedPointsBalance,
         });
+        await queryClient.invalidateQueries({ queryKey: pointsQueryKey });
+      } else {
+        setRedeemError("Redemption could not be completed.");
         await queryClient.invalidateQueries({ queryKey: pointsQueryKey });
       }
       await queryClient.invalidateQueries({ queryKey: ["rewards"] });

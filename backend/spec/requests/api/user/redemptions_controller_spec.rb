@@ -104,7 +104,15 @@ RSpec.describe "Api::V1::User::RedemptionsController", type: :request do
   end
 
   describe "POST /api/v1/user/redemptions" do
-    let(:reward) { create(:reward, points_cost: 100, is_available: true) }
+    let(:reward) do
+      create(
+        :reward,
+        points_cost: 100,
+        is_available: true,
+        reward_type: "vip_experience",
+        fulfillment_provider: "ticketmaster"
+      )
+    end
 
     context "when not signed in" do
       it "returns unauthorized" do
@@ -140,6 +148,7 @@ RSpec.describe "Api::V1::User::RedemptionsController", type: :request do
       it "enqueues async redemption processing and returns processing state" do
         key = "406625f1-81c1-43e4-9e74-377e4c6ff31c"
         allow(User::Redemptions::ProcessJob).to receive(:perform_in)
+        allow(User::Redemptions::Create).to receive(:call).and_call_original
 
         post "/api/v1/user/redemptions",
              params: { redemption: { reward_id: reward.id } },
@@ -151,6 +160,7 @@ RSpec.describe "Api::V1::User::RedemptionsController", type: :request do
           reward.id,
           key
         )
+        expect(User::Redemptions::Create).not_to have_received(:call)
 
         expect(response).to have_http_status(:accepted)
         body = JSON.parse(response.body)
@@ -162,6 +172,36 @@ RSpec.describe "Api::V1::User::RedemptionsController", type: :request do
         redemption = user.redemptions.find_by(idempotency_key: key)
         expect(redemption).to be_present
         expect(redemption.status).to eq("processing")
+      end
+
+      it "completes synchronously for internal-provider rewards without enqueueing" do
+        key = "c1708496-7ca0-4f4d-8c6b-eb7700ef7cf1"
+        sync_reward = create(
+          :reward,
+          points_cost: 100,
+          is_available: true,
+          reward_type: "free_item",
+          fulfillment_provider: "internal"
+        )
+        allow(User::Redemptions::ProcessJob).to receive(:perform_in)
+        allow(User::Redemptions::PlaceCreditHoldAndReserve).to receive(:call).and_call_original
+
+        post "/api/v1/user/redemptions",
+             params: { redemption: { reward_id: sync_reward.id } },
+             headers: { "Idempotency-Key" => key, "X-CSRF-Token" => csrf_token }
+
+        expect(User::Redemptions::ProcessJob).not_to have_received(:perform_in)
+        expect(User::Redemptions::PlaceCreditHoldAndReserve).not_to have_received(:call)
+        expect(response).to have_http_status(:ok)
+        body = JSON.parse(response.body)
+        expect(body["data"]).to include(
+          "request_id" => key,
+          "reward_id" => sync_reward.id,
+          "status" => "completed"
+        )
+        redemption = user.redemptions.find_by(idempotency_key: key)
+        expect(redemption).to be_present
+        expect(redemption.status).to eq("completed")
       end
 
       it "returns bad_request when idempotency key header is missing" do

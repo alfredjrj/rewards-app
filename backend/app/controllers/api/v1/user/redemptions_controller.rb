@@ -29,35 +29,42 @@ class Api::V1::User::RedemptionsController < AuthenticationController
     user_redemption = current_user.redemptions.build(reward: @reward)
     authorize user_redemption
 
-    enqueue_result = User::Redemptions::PlaceCreditHoldAndEnqueue.call(
-      user: current_user,
-      reward: @reward,
-      idempotency_key: @idempotency_key,
-      change_source_origin: "api_request",
-      change_source_metadata: {
-        "kind" => "http",
-        "path" => request.path,
-        "method" => request.method,
-        "request_uuid" => request.request_id
-      }.compact
-    )
-    unless enqueue_result.success?
-      error_status = enqueue_result.error&.dig(:code) == "enqueue_unavailable" ? :service_unavailable : :unprocessable_entity
+    result = if @reward.sync_fulfillment?
+      User::Redemptions::Create.call(
+        user: current_user,
+        reward: @reward,
+        idempotency_key: @idempotency_key,
+        change_source_origin: "api_request",
+        change_source_metadata: request_metadata.merge("fulfillment_path" => "sync")
+      )
+    else
+      User::Redemptions::PlaceCreditHoldAndReserve.call(
+        user: current_user,
+        reward: @reward,
+        idempotency_key: @idempotency_key,
+        change_source_origin: "api_request",
+        change_source_metadata: request_metadata.merge("fulfillment_path" => "async")
+      )
+    end
+
+    unless result.success?
+      error_code = result.error&.dig(:code)
+      error_status = %w[enqueue_unavailable internal_error].include?(error_code) ? :service_unavailable : :unprocessable_entity
       render_api_error(
-        code: enqueue_result.error&.dig(:code) || "redemption_failed",
-        message: enqueue_result.error&.dig(:message) || "Unable to process redemption",
+        code: error_code || "redemption_failed",
+        message: result.error&.dig(:message) || "Unable to process redemption",
         status: error_status,
-        details: enqueue_result.error&.dig(:details)
+        details: result.error&.dig(:details)
       )
       return
     end
 
-    result_status = enqueue_result.redemption&.status || "processing"
+    result_status = result.redemption&.status || "processing"
     http_status = result_status == "processing" ? :accepted : :ok
 
     render json: ::Api::V1::User::RedemptionSerializer::Status.call(
       request_id: @idempotency_key,
-      reward_id: enqueue_result.redemption&.reward_id || @reward.id,
+      reward_id: result.redemption&.reward_id || @reward.id,
       status: result_status
     ), status: http_status
   end
@@ -111,6 +118,15 @@ class Api::V1::User::RedemptionsController < AuthenticationController
 
   def existing_redemption_for(idempotency_key)
     current_user.redemptions.find_by(idempotency_key: idempotency_key)
+  end
+
+  def request_metadata
+    {
+      "kind" => "http",
+      "path" => request.path,
+      "method" => request.method,
+      "request_uuid" => request.request_id
+    }.compact
   end
 
   def set_create_idempotency_key

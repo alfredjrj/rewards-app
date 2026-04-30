@@ -232,6 +232,37 @@ describe("useRewardsPageState", () => {
     expect(redeemRewardMock).not.toHaveBeenCalled();
   });
 
+  it("shows an error when redemption returns non-completed terminal status", async () => {
+    redeemRewardMock.mockResolvedValueOnce({
+      data: {
+        reward_id: 1,
+        status: "failed",
+      },
+    });
+    const { result } = renderHook(() =>
+      useRewardsPageState({
+        user,
+        authLoading: false,
+      }),
+      { wrapper: createWrapper() }
+    );
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    act(() => {
+      result.current.openRedeemModal(reward);
+    });
+
+    await act(async () => {
+      await result.current.confirmRedeem();
+    });
+
+    expect(result.current.error).toBe("Redemption could not be completed.");
+    expect(result.current.redemptionSuccesses).toHaveLength(0);
+  });
+
   it("rehydrates processing redemptions from session storage after refresh", async () => {
     window.sessionStorage.setItem(
       "processing_redemptions",

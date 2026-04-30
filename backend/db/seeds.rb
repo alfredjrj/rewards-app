@@ -15,6 +15,7 @@ rewards_data = [
     description: "Redeem for a free cup of coffee at participating locations.",
     points_cost: 100,
     reward_type: "free_item",
+    fulfillment_provider: "internal",
     is_available: true
   },
   {
@@ -22,6 +23,7 @@ rewards_data = [
     description: "Get a $5 gift card to use at any partner store.",
     points_cost: 250,
     reward_type: "free_item",
+    fulfillment_provider: "ticketmaster",
     is_available: true
   },
   {
@@ -29,6 +31,7 @@ rewards_data = [
     description: "Enjoy one free movie ticket at select theaters.",
     points_cost: 500,
     reward_type: "vip_experience",
+    fulfillment_provider: "ticketmaster",
     is_available: true
   },
   {
@@ -36,6 +39,7 @@ rewards_data = [
     description: "Treat yourself to a relaxing spa session.",
     points_cost: 1000,
     reward_type: "vip_experience",
+    fulfillment_provider: "ticketmaster",
     is_available: true
   },
   {
@@ -50,6 +54,7 @@ rewards_data = [
     description: "Get priority customer support for one month.",
     points_cost: 220,
     reward_type: "vip_experience",
+    fulfillment_provider: "ticketmaster",
     is_available: true
   },
   {
@@ -71,6 +76,7 @@ rewards_data = [
     description: "Access premium lounge amenities for one day.",
     points_cost: 900,
     reward_type: "vip_experience",
+    fulfillment_provider: "ticketmaster",
     is_available: true
   },
   {
@@ -92,6 +98,7 @@ rewards_data = [
     description: "Exclusive chef's table experience for one guest.",
     points_cost: 2400,
     reward_type: "vip_experience",
+    fulfillment_provider: "ticketmaster",
     is_available: true
   },
   {
@@ -113,6 +120,7 @@ rewards_data = [
     description: "Reserved front-row seating at selected events.",
     points_cost: 2700,
     reward_type: "vip_experience",
+    fulfillment_provider: "ticketmaster",
     is_available: true
   },
   {
@@ -134,6 +142,7 @@ rewards_data = [
     description: "Behind-the-scenes tour at a partner venue.",
     points_cost: 2100,
     reward_type: "vip_experience",
+    fulfillment_provider: "ticketmaster",
     is_available: true
   },
   {
@@ -155,6 +164,7 @@ rewards_data = [
     description: "Skip lines with express entry at selected venues.",
     points_cost: 1100,
     reward_type: "vip_experience",
+    fulfillment_provider: "ticketmaster",
     is_available: true
   },
   {
@@ -176,6 +186,7 @@ rewards_data = [
     description: "Private studio class with priority booking.",
     points_cost: 1950,
     reward_type: "vip_experience",
+    fulfillment_provider: "ticketmaster",
     is_available: true
   },
   {
@@ -197,6 +208,7 @@ rewards_data = [
     description: "Evening cruise with light refreshments.",
     points_cost: 1850,
     reward_type: "vip_experience",
+    fulfillment_provider: "ticketmaster",
     is_available: true
   },
   {
@@ -218,6 +230,7 @@ rewards_data = [
     description: "Two-day beginner-friendly yoga intensive.",
     points_cost: 1420,
     reward_type: "vip_experience",
+    fulfillment_provider: "ticketmaster",
     is_available: true
   },
   {
@@ -239,6 +252,7 @@ rewards_data = [
     description: "Priority reservations at partner restaurants for one month.",
     points_cost: 1750,
     reward_type: "vip_experience",
+    fulfillment_provider: "ticketmaster",
     is_available: true
   },
   {
@@ -304,7 +318,7 @@ user_redemptions_seed.each do |attrs|
       points_cost_snapshot: reward.points_cost,
       status: "completed"
     )
-    User::Redemptions::Audit.record(
+    User::Redemptions::Audit.record_async(
       redemption: redemption,
       change_reason: was_new ? "created" : "updated",
       change_source_origin: "system",
@@ -343,7 +357,7 @@ user_redemptions_seed.each do |attrs|
       points_cost_snapshot: reward.points_cost,
       status: "cancelled"
     )
-    User::Redemptions::Audit.record(
+    User::Redemptions::Audit.record_async(
       redemption: redemption,
       change_reason: was_new ? "created" : "updated",
       change_source_origin: "system",

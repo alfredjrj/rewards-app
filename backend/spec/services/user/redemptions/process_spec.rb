@@ -26,12 +26,12 @@ RSpec.describe User::Redemptions::Process do
         redemption: instance_double(User::Redemption, reward_id: reward.id),
         point_transaction: nil
       )
-      allow(User::Redemptions::Create).to receive(:call).and_return(result)
+      allow(User::Redemptions::CreateWithReservation).to receive(:call).and_return(result)
       allow(ActionCable.server).to receive(:broadcast)
 
       described_class.call(user_id: user.id, reward_id: reward.id, request_id: key)
 
-      expect(User::Redemptions::Create).to have_received(:call).with(
+      expect(User::Redemptions::CreateWithReservation).to have_received(:call).with(
         user: user,
         reward: reward,
         idempotency_key: key,
@@ -54,7 +54,7 @@ RSpec.describe User::Redemptions::Process do
       reward = create(:reward)
       key = "deadbeef-dead-beef-dead-beefdeadbeef"
       allow(User).to receive(:find).with(user.id).and_raise(ActiveRecord::Deadlocked.new("deadlock"))
-      expect(User::Redemptions::Create).not_to receive(:call)
+      expect(User::Redemptions::CreateWithReservation).not_to receive(:call)
 
       expect do
         described_class.call(user_id: user.id, reward_id: reward.id, request_id: key)
@@ -69,7 +69,7 @@ RSpec.describe User::Redemptions::Process do
         ActiveRecord::RecordNotFound.new("Couldn't find User")
       )
       allow(ActionCable.server).to receive(:broadcast)
-      expect(User::Redemptions::Create).not_to receive(:call)
+      expect(User::Redemptions::CreateWithReservation).not_to receive(:call)
 
       expect do
         described_class.call(user_id: user.id, reward_id: reward.id, request_id: key)
@@ -94,7 +94,7 @@ RSpec.describe User::Redemptions::Process do
         success?: false,
         error: { code: "internal_error", message: "Unable to redeem reward" }
       )
-      allow(User::Redemptions::Create).to receive(:call).and_return(result)
+      allow(User::Redemptions::CreateWithReservation).to receive(:call).and_return(result)
       allow(ActionCable.server).to receive(:broadcast)
 
       expect do
@@ -117,7 +117,7 @@ RSpec.describe User::Redemptions::Process do
       )
       error = { code: "insufficient_balance", message: "Not enough points" }
       result = instance_double("ServiceResponse", success?: false, error: error)
-      allow(User::Redemptions::Create).to receive(:call).and_return(result)
+      allow(User::Redemptions::CreateWithReservation).to receive(:call).and_return(result)
       allow(ActionCable.server).to receive(:broadcast)
 
       described_class.call(user_id: user.id, reward_id: reward.id, request_id: key)
