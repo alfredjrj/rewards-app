@@ -23,4 +23,16 @@ class User::PointTransaction < ApplicationRecord
   validates :reason_code, inclusion: { in: REASON_CODES }
   validates :source_type, inclusion: { in: ALLOWED_SOURCE_TYPES }, allow_nil: true
   validates :idempotency_key, presence: true, uniqueness: { scope: :user_id }
+
+  before_destroy :prevent_destroy
+
+  def readonly?
+    persisted?
+  end
+
+  private
+
+  def prevent_destroy
+    raise ActiveRecord::ReadOnlyRecord, "#{self.class.name} is append-only and cannot be deleted"
+  end
 end

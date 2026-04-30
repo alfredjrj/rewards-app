@@ -76,4 +76,22 @@ RSpec.describe User::PointTransaction, type: :model do
       expect(transaction.errors[:source_type]).to include("is not included in the list")
     end
   end
+
+  describe "immutability" do
+    it "prevents updates after creation" do
+      transaction = create(:user_point_transaction, amount: 100)
+
+      expect do
+        transaction.update!(amount: 200)
+      end.to raise_error(ActiveRecord::ReadOnlyRecord)
+    end
+
+    it "prevents deletion" do
+      transaction = create(:user_point_transaction)
+
+      expect do
+        transaction.destroy!
+      end.to raise_error(ActiveRecord::ReadOnlyRecord)
+    end
+  end
 end
