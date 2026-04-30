@@ -28,11 +28,20 @@ module User::Redemptions
     rescue StandardError => e
       Rails.logger.warn(e.full_message)
       if @created_redemption
-        @created_redemption.assign_change_source_origin(
-          change_source_origin: change_source_origin,
-          change_source_metadata: change_source_metadata.merge("failure" => "enqueue_unavailable")
-        )
-        @created_redemption.update!(status: "failed")
+        transitioned = @created_redemption.fail!
+        if transitioned
+          User::Redemptions::Audit.record(
+            redemption: @created_redemption,
+            change_reason: "updated",
+            change_source_origin: change_source_origin,
+            change_source_metadata: change_source_metadata.merge("failure" => "enqueue_unavailable")
+          )
+        else
+          Rails.logger.error(
+            "[redemption.place_hold] transition_failed redemption_id=#{@created_redemption.id} " \
+            "from=#{@created_redemption.status} to=failed"
+          )
+        end
       end
       enqueue_unavailable_failure(@created_redemption)
     end
@@ -62,11 +71,13 @@ module User::Redemptions
         status: "processing",
         idempotency_key: idempotency_key
       )
-      redemption.assign_change_source_origin(
+      redemption.save!
+      User::Redemptions::Audit.record(
+        redemption: redemption,
+        change_reason: "created",
         change_source_origin: change_source_origin,
         change_source_metadata: change_source_metadata
       )
-      redemption.save!
       redemption
     end
 

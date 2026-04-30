@@ -78,68 +78,92 @@ This service owns:
 - `POST /api/v1/user/redemptions`
 - `GET /api/v1/user/redemptions/:id` (`:id` = request/idempotency key)
 
-## Redemption Lifecycle
+## Redemption + Points Lifecycle
 
-`POST /api/v1/user/redemptions` follows a two-phase flow:
+This system is intentionally split into:
 
-1. Validate the `Idempotency-Key` header (`Idempotency::KeyValidator`).
-2. If the same key was already used by this user, replay the existing redemption result instead of creating a duplicate request.
-3. For a new key, place a credit hold by creating a `processing` redemption snapshot, then enqueue `User::Redemptions::ProcessJob`.
+- **operational state** in `user_redemptions` (request status)
+- **financial truth** in `user_point_transactions` (append-only ledger)
+- **state history** in `user_redemption_audits` (snapshots per change)
+
+### 1) Request enters (`POST /api/v1/user/redemptions`)
+
+1. Validate `Idempotency-Key`.
+2. If key already exists for the user, replay the existing request state (no duplicate write).
+3. If key is new, run `User::Redemptions::PlaceCreditHoldAndEnqueue`:
+   - create a `user_redemptions` row with status `processing` (credit hold)
+   - enqueue `User::Redemptions::ProcessJob`
+   - write the corresponding audit snapshot for the hold
 4. Return immediately:
-   - `202 Accepted` when the request is still `processing`
-   - `200 OK` when replaying a previously completed terminal result
+   - `202 Accepted` when still `processing`
+   - `200 OK` for replayed terminal result
 
-The worker completes phase two asynchronously:
+At this stage, no points are debited yet.
 
-- executes the redemption business logic
-- marks the request as `completed` or `failed`
-- publishes status updates for realtime clients and polling fallback (`GET /api/v1/user/redemptions/:id`)
+### 2) Async processor finalizes redemption
 
-## Redemption Audit Snapshots
+`User::Redemptions::ProcessJob` runs `User::Redemptions::Process`, which calls `User::Redemptions::Create`.
 
-Redemption lifecycle auditing is snapshot-based:
+Inside the finalize transaction:
 
-- `User::Redemption` uses `after_create` / `after_update` to append one `User::RedemptionAudit` row per save (via `User::Redemptions::Audit` only)
-- **Provenance** is explicit: call `redemption.assign_change_source_origin(change_source_origin:, change_source_metadata:)` before saves that record audits, or pass the same keywords into services (`PlaceCreditHoldAndEnqueue`, `Process`, `StatusTransition`, `Create`). The API create action uses `api_request` with request metadata; `ProcessJob` uses `background_job` with Sidekiq/request ids; seeds use `background_job` with `source: db/seeds`. If unset, audits fall back to `system` (internal / unspecified caller). The column is `user_redemption_audits.change_source_origin`, matching in-memory `User::Redemption#change_source_origin`.
-- each row stores a single `snapshot` JSON (the state after that change)
-- previous state is derived from the prior row for the same `user_redemption_id`
-- `point_transaction_id` is optional and linked when a related ledger row exists
-- failed audit inserts are logged and do not roll back the redemption row (`Audit.record` rescues persist errors)
+1. Confirm reward and request state are still valid.
+2. Create one ledger debit in `user_point_transactions` with:
+   - negative `amount`
+   - `reason_code: reward_redemption`
+   - updated `running_balance`
+   - `source` linked to the redemption
+3. Update redemption status from `processing` to `completed`.
 
-This keeps the model simple while preserving full history of object evolution.
+If domain validation fails, redemption transitions to `failed` and no debit is committed.
+If transient infrastructure fails, job retries and eventually marks `failed` when retries are exhausted.
 
-### Why single snapshot (no before_snapshot)
+### 3) Status model
 
-`User::RedemptionAudit` intentionally stores only one snapshot per row:
+`user_redemptions.status` lifecycle:
 
-- lower write/storage overhead than storing both before/after payloads
-- cleaner write path (every change appends exactly one record)
-- prior state can be reconstructed from the previous audit row in time order
+- `processing` -> `completed`
+- `processing` -> `failed`
+- `processing` -> `cancelled` (business/system path)
 
-This is enough for lifecycle history while keeping schema and writes minimal.
+Terminal statuses are not reopened by replay requests with the same idempotency key.
 
-### Source-of-truth contract
+### 4) Point transaction lifecycle (ledger model)
 
-- `user_point_transactions` answers financial questions:
-  - what changed the balance
-  - exact debit/credit amounts
-  - reconciliation
-- `user_redemption_audits` answers operational history questions:
-  - how redemption object values evolved over time
-  - when status or other attributes changed
-  - linkage to financial side effects (optional `point_transaction_id`)
+`user_point_transactions` is append-only. Each row records one balance-changing event:
 
-When debugging or auditing a redemption:
+- earns (`kind: earn`)
+- redemptions (`kind: redeem`)
+- adjustments/expiry/reversal
 
-1. find `user_redemptions` by request/idempotency key
-2. inspect `user_redemption_audits` ordered by `created_at`
-3. follow `point_transaction_id` when present for ledger proof
+Current balance is derived from ledger state (`running_balance` / latest transaction), not from `user_redemptions`.
+This keeps accounting deterministic and auditable.
 
-Typical query:
+### 5) Audit snapshot lifecycle
 
-```sql
-SELECT created_at, change_reason, change_source_origin, snapshot, point_transaction_id
-FROM user_redemption_audits
-WHERE user_redemption_id = :redemption_id
-ORDER BY created_at ASC, id ASC;
-```
+Audit writes are explicit and asynchronous:
+
+1. Services call `User::Redemptions::Audit.record(...)` right after redemption state changes.
+2. `Audit.record` builds payload with provenance (`change_source_origin`, `change_source_metadata`) and `event_at`.
+3. Payload is enqueued to `User::Redemptions::AuditJob` after DB commit.
+4. Job inserts `user_redemption_audits` row with one `snapshot` JSON.
+
+`event_at` preserves event order even if Sidekiq persistence order differs.
+For reconstruction, order by `event_at`, then `id`.
+
+### 6) Source-of-truth contract
+
+- Use `user_point_transactions` for financial/reconciliation answers:
+  - what changed balance
+  - exact debit/credit amount
+  - final balance correctness
+- Use `user_redemption_audits` for object-history answers:
+  - how redemption fields changed over time
+  - when status moved between lifecycle states
+  - which ledger row was associated (`point_transaction_id`, when present)
+
+### 7) Practical debugging flow
+
+1. Find redemption by idempotency key in `user_redemptions`.
+2. Read audit timeline in `user_redemption_audits` ordered by `event_at ASC, id ASC`.
+3. Follow `point_transaction_id` to the ledger row for balance proof.
+

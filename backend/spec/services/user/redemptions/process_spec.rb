@@ -1,6 +1,13 @@
 require "rails_helper"
 
 RSpec.describe User::Redemptions::Process do
+  before do
+    allow(ActiveRecord).to receive(:after_all_transactions_commit).and_yield
+    allow(User::Redemptions::AuditJob).to receive(:perform_async) do |payload|
+      User::Redemptions::AuditJob.new.perform(payload.deep_stringify_keys)
+    end
+  end
+
   describe ".call" do
     it "runs Create and broadcasts completed status" do
       user = create(:user)

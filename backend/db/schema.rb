@@ -57,6 +57,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_04_29_214000) do
     t.bigint "reward_id", null: false
     t.bigint "point_transaction_id"
     t.string "request_id", null: false
+    t.datetime "event_at", null: false
     t.string "change_source_origin", null: false
     t.string "change_reason", null: false
     t.jsonb "snapshot", default: {}, null: false
@@ -67,6 +68,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_04_29_214000) do
     t.index ["point_transaction_id"], name: "index_user_redemption_audits_on_point_transaction_id"
     t.index ["request_id"], name: "index_user_redemption_audits_on_request_id"
     t.index ["reward_id"], name: "index_user_redemption_audits_on_reward_id"
+    t.index ["user_redemption_id", "event_at", "id"], name: "idx_redemption_audits_redemption_event_at_id"
     t.index ["user_id", "created_at"], name: "index_user_redemption_audits_on_user_id_and_created_at"
     t.index ["user_id"], name: "index_user_redemption_audits_on_user_id"
     t.index ["user_redemption_id", "created_at"], name: "idx_on_user_redemption_id_created_at_14c1a4ca51"

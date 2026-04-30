@@ -298,14 +298,17 @@ user_redemptions_seed.each do |attrs|
     redemption_key = "seed-user-redemption-#{attrs[:idempotency_key]}"
 
     redemption = User::Redemption.find_or_initialize_by(user: user, idempotency_key: redemption_key)
-    redemption.assign_change_source_origin(
-      change_source_origin: "background_job",
-      change_source_metadata: { "source" => "db/seeds" }
-    )
+    was_new = redemption.new_record?
     redemption.update!(
       reward: reward,
       points_cost_snapshot: reward.points_cost,
       status: "completed"
+    )
+    User::Redemptions::Audit.record(
+      redemption: redemption,
+      change_reason: was_new ? "created" : "updated",
+      change_source_origin: "system",
+      change_source_metadata: {}
     )
 
     redeem_amount = -reward.points_cost
@@ -334,14 +337,17 @@ user_redemptions_seed.each do |attrs|
     redemption_key = "seed-user-redemption-#{attrs[:idempotency_key]}"
 
     redemption = User::Redemption.find_or_initialize_by(user: user, idempotency_key: redemption_key)
-    redemption.assign_change_source_origin(
-      change_source_origin: "background_job",
-      change_source_metadata: { "source" => "db/seeds" }
-    )
+    was_new = redemption.new_record?
     redemption.update!(
       reward: reward,
       points_cost_snapshot: reward.points_cost,
       status: "cancelled"
+    )
+    User::Redemptions::Audit.record(
+      redemption: redemption,
+      change_reason: was_new ? "created" : "updated",
+      change_source_origin: "system",
+      change_source_metadata: {}
     )
 
     puts "Redemption seeded: #{redemption.id} #{reward.title} (cancelled, no points deducted)"

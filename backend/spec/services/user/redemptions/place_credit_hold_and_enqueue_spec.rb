@@ -7,6 +7,7 @@ RSpec.describe User::Redemptions::PlaceCreditHoldAndEnqueue do
     let(:idempotency_key) { "4feb0ed2-c6ca-466a-aea0-d3b9f8e54311" }
 
     before do
+      allow(ActiveRecord).to receive(:after_all_transactions_commit).and_yield
       create(
         :user_point_transaction,
         user: user,
@@ -16,6 +17,9 @@ RSpec.describe User::Redemptions::PlaceCreditHoldAndEnqueue do
         reason_code: "purchase",
         idempotency_key: "0482e2d5-a0f5-4f53-a8d0-2f97a6ff9a26"
       )
+      allow(User::Redemptions::AuditJob).to receive(:perform_async) do |payload|
+        User::Redemptions::AuditJob.new.perform(payload.deep_stringify_keys)
+      end
     end
 
     it "creates a processing redemption and enqueues processing job" do
@@ -83,6 +87,21 @@ RSpec.describe User::Redemptions::PlaceCreditHoldAndEnqueue do
       update_audit = redemption.audits.where(change_reason: "updated").order(:id).last
       expect(update_audit).to be_present
       expect(update_audit.snapshot).to include("status" => "failed")
+    end
+
+    it "does not queue updated audit when transition to failed is rejected" do
+      allow(User::Redemptions::ProcessJob).to receive(:perform_in).and_raise(StandardError, "redis down")
+      allow(Rails.logger).to receive(:error)
+      allow_any_instance_of(User::Redemption).to receive(:fail!).and_return(false)
+
+      result = described_class.call(user: user, reward: reward, idempotency_key: idempotency_key)
+
+      expect(result.success?).to be(false)
+      redemption = user.redemptions.find_by(idempotency_key: idempotency_key)
+      expect(redemption).to be_present
+      expect(redemption.status).to eq("processing")
+      expect(redemption.audits.pluck(:change_reason)).to eq([ "created" ])
+      expect(Rails.logger).to have_received(:error).with(include("[redemption.place_hold] transition_failed"))
     end
 
     it "creates exactly one processing redemption under concurrent calls with same idempotency key", :concurrency do

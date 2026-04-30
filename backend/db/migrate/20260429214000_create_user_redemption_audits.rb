@@ -6,6 +6,7 @@ class CreateUserRedemptionAudits < ActiveRecord::Migration[8.0]
       t.references :reward, null: false, foreign_key: true, index: true
       t.references :point_transaction, foreign_key: { to_table: :user_point_transactions }, index: true
       t.string :request_id, null: false
+      t.datetime :event_at, null: false
       t.string :change_source_origin, null: false
       t.string :change_reason, null: false
       t.jsonb :snapshot, null: false, default: {}
@@ -15,6 +16,7 @@ class CreateUserRedemptionAudits < ActiveRecord::Migration[8.0]
     end
 
     add_index :user_redemption_audits, :request_id
+    add_index :user_redemption_audits, [ :user_redemption_id, :event_at, :id ], name: "idx_redemption_audits_redemption_event_at_id"
     add_index :user_redemption_audits, [ :user_redemption_id, :created_at ]
     add_index :user_redemption_audits, [ :user_id, :created_at ]
     add_index :user_redemption_audits, [ :change_reason, :created_at ]

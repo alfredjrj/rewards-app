@@ -1,6 +1,13 @@
 require "rails_helper"
 
 RSpec.describe User::Redemption, type: :model do
+  before do
+    allow(ActiveRecord).to receive(:after_all_transactions_commit).and_yield
+    allow(User::Redemptions::AuditJob).to receive(:perform_async) do |payload|
+      User::Redemptions::AuditJob.new.perform(payload.deep_stringify_keys)
+    end
+  end
+
   it "is valid with factory defaults" do
     expect(build(:user_redemption)).to be_valid
   end
@@ -31,6 +38,11 @@ RSpec.describe User::Redemption, type: :model do
 
   it "prevents destroy while an audit trail exists" do
     redemption = create(:user_redemption)
+    User::Redemptions::Audit.record(
+      redemption: redemption,
+      change_reason: "created",
+      change_source_origin: "system"
+    )
 
     expect(redemption.destroy).to be(false)
     expect(redemption.errors[:base]).to include(
@@ -39,35 +51,36 @@ RSpec.describe User::Redemption, type: :model do
   end
 
   describe "audit snapshots" do
-    it "creates a created audit row on insert" do
+    it "does not auto-create audit rows from model callbacks" do
       redemption = create(:user_redemption, status: "processing")
 
-      audit = redemption.audits.order(:id).last
-      expect(audit).to be_present
-      expect(audit.change_reason).to eq("created")
-      expect(audit.snapshot).to include("status" => "processing")
-      expect(audit.point_transaction_id).to be_nil
+      expect(redemption.audits).to be_empty
+    end
+  end
+
+  describe "status transitions" do
+    it "allows processing -> completed" do
+      redemption = create(:user_redemption, status: "processing")
+
+      expect { redemption.complete! }
+        .to change { redemption.reload.status }
+        .from("processing").to("completed")
     end
 
-    it "creates updated audit row and links related point transaction when present" do
+    it "rejects completed -> failed" do
+      redemption = create(:user_redemption, status: "completed")
+
+      expect(redemption.may_fail?).to be(false)
+      expect(redemption.fail!).to be(false)
+      expect(redemption.reload.status).to eq("completed")
+    end
+
+    it "exposes aasm guard helpers" do
       redemption = create(:user_redemption, status: "processing")
-      points_tx = create(
-        :user_point_transaction,
-        user: redemption.user,
-        amount: -redemption.points_cost_snapshot,
-        running_balance: 0,
-        kind: "redeem",
-        reason_code: "reward_redemption",
-        idempotency_key: "status-change-tx-1",
-        source: redemption
-      )
 
-      redemption.update!(status: "completed")
-
-      audit = redemption.audits.where(change_reason: "updated").order(:id).last
-      expect(audit).to be_present
-      expect(audit.snapshot).to include("status" => "completed")
-      expect(audit.point_transaction_id).to eq(points_tx.id)
+      expect(redemption.may_complete?).to be(true)
+      expect(redemption.may_fail?).to be(true)
+      expect(redemption.may_cancel?).to be(true)
     end
   end
 end

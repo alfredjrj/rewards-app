@@ -7,6 +7,7 @@ RSpec.describe User::Redemptions::Create do
     let(:idempotency_key) { "ca022f41-0f0b-40df-8835-e0ca3c52f23d" }
 
     before do
+      allow(ActiveRecord).to receive(:after_all_transactions_commit).and_yield
       create(
         :user_point_transaction,
         user: user,
@@ -16,40 +17,50 @@ RSpec.describe User::Redemptions::Create do
         reason_code: "purchase",
         idempotency_key: "29f622c5-eb39-4d68-9859-0e8092fbd007"
       )
+      allow(User::Redemptions::AuditJob).to receive(:perform_async) do |payload|
+        User::Redemptions::AuditJob.new.perform(payload.deep_stringify_keys)
+      end
     end
 
-    it "creates redemption and deducts user points" do
+    it "returns reservation_missing when processing redemption is not reserved first" do
       result = described_class.call(user: user, reward: reward, idempotency_key: idempotency_key)
 
-      expect(result.success?).to be(true)
-      expect(result.redemption).to be_persisted
-      expect(result.redemption.reward).to eq(reward)
-      expect(result.points_balance).to eq(380)
-      expect(result.point_transaction).to be_present
-      debit = user.point_transactions.order(:id).last
-      expect(debit.amount).to eq(-120)
-      expect(debit.source).to eq(result.redemption)
-      expect(result.point_transaction.id).to eq(debit.id)
-      audits = result.redemption.audits.order(:id)
-      expect(audits.pluck(:change_reason)).to eq([ "created", "updated" ])
-      expect(audits.last.snapshot).to include(
-        "status" => "completed",
-        "points_cost_snapshot" => reward.points_cost
+      expect(result.success?).to be(false)
+      expect(result.error).to eq(
+        code: "reservation_missing",
+        message: "Redemption reservation was not found"
       )
-      expect(audits.last.point_transaction_id).to eq(debit.id)
+      expect(user.redemptions.count).to eq(0)
+      expect(user.point_transactions.count).to eq(1)
     end
 
     it "returns idempotent hit for duplicate key" do
+      processing = create(
+        :user_redemption,
+        user: user,
+        reward: reward,
+        points_cost_snapshot: reward.points_cost,
+        status: "processing",
+        idempotency_key: idempotency_key
+      )
       first = described_class.call(user: user, reward: reward, idempotency_key: idempotency_key)
       second = described_class.call(user: user, reward: reward, idempotency_key: idempotency_key)
 
       expect(first.success?).to be(true)
       expect(second.success?).to be(true)
-      expect(second.redemption.id).to eq(first.redemption.id)
+      expect(second.redemption.id).to eq(processing.id)
       expect(user.redemptions.count).to eq(1)
     end
 
     it "returns reward_unavailable when reward cannot be redeemed" do
+      create(
+        :user_redemption,
+        user: user,
+        reward: reward,
+        points_cost_snapshot: reward.points_cost,
+        status: "processing",
+        idempotency_key: idempotency_key
+      )
       reward.update!(is_available: false)
 
       result = described_class.call(user: user, reward: reward, idempotency_key: idempotency_key)
@@ -59,17 +70,33 @@ RSpec.describe User::Redemptions::Create do
     end
 
     it "returns insufficient_balance when points are not enough" do
-      reward.update!(points_cost: 900)
+      create(
+        :user_redemption,
+        user: user,
+        reward: reward,
+        points_cost_snapshot: 900,
+        status: "processing",
+        idempotency_key: idempotency_key
+      )
 
       result = described_class.call(user: user, reward: reward, idempotency_key: idempotency_key)
 
       expect(result.success?).to be(false)
       expect(result.error).to include(code: "insufficient_balance")
-      expect(user.redemptions.count).to eq(0)
+      expect(user.redemptions.count).to eq(1)
+      expect(user.redemptions.find_by(idempotency_key: idempotency_key)&.status).to eq("processing")
     end
 
-    it "rolls back points deduction when redemption creation fails" do
-      allow_any_instance_of(User::Redemption).to receive(:update!).and_raise(
+    it "rolls back points deduction when completion transition fails" do
+      create(
+        :user_redemption,
+        user: user,
+        reward: reward,
+        points_cost_snapshot: reward.points_cost,
+        status: "processing",
+        idempotency_key: idempotency_key
+      )
+      allow_any_instance_of(User::Redemption).to receive(:complete!).and_raise(
         ActiveRecord::RecordInvalid.new(User::Redemption.new)
       )
 
@@ -77,7 +104,6 @@ RSpec.describe User::Redemptions::Create do
 
       expect(result.success?).to be(false)
       expect(result.error).to include(code: "validation_error")
-      expect(user.redemptions.count).to eq(0)
       expect(user.point_transactions.count).to eq(1)
       expect(user.point_transactions.order(:id).last.running_balance).to eq(500)
     end
@@ -173,11 +199,40 @@ RSpec.describe User::Redemptions::Create do
     end
 
     it "re-raises unexpected exceptions so retries/error monitoring can capture them" do
+      create(
+        :user_redemption,
+        user: user,
+        reward: reward,
+        points_cost_snapshot: reward.points_cost,
+        status: "processing",
+        idempotency_key: idempotency_key
+      )
       allow(User::PointTransactions::Create).to receive(:call).and_raise(NoMethodError, "boom")
 
       expect do
         described_class.call(user: user, reward: reward, idempotency_key: idempotency_key)
       end.to raise_error(NoMethodError, "boom")
+    end
+
+    it "does not queue updated audit when state transition to completed fails" do
+      processing = create(
+        :user_redemption,
+        user: user,
+        reward: reward,
+        points_cost_snapshot: reward.points_cost,
+        status: "processing",
+        idempotency_key: idempotency_key
+      )
+      allow(User::Redemptions::AuditJob).to receive(:perform_async)
+      allow_any_instance_of(User::Redemption).to receive(:complete!).and_return(false)
+
+      result = described_class.call(user: user, reward: reward, idempotency_key: idempotency_key)
+
+      expect(result.success?).to be(false)
+      expect(result.error).to include(code: "validation_error")
+      expect(processing.reload.status).to eq("processing")
+      expect(User::Redemptions::AuditJob).not_to have_received(:perform_async)
+      expect(processing.audits).to be_empty
     end
   end
 end

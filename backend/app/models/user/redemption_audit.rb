@@ -9,6 +9,7 @@ class User::RedemptionAudit < ApplicationRecord
   belongs_to :point_transaction, class_name: "User::PointTransaction", optional: true
 
   validates :request_id, presence: true
+  validates :event_at, presence: true
   validates :change_source_origin, presence: true, inclusion: { in: CHANGE_SOURCES }
   validates :change_reason, presence: true, inclusion: { in: CHANGE_REASONS }
   validates :snapshot, presence: true

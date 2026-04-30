@@ -4,84 +4,70 @@ module User::Redemptions
   # Money and balances live in `User::PointTransaction` (the ledger). Audit rows are only an operational
   # history (who changed what, when), not the source of truth for balances.
   #
-  # Provenance: call `redemption.assign_change_source_origin` before the save, and/or pass `change_source_origin` /
-  # `change_source_metadata` into `record`. If you skip both, `change_source_origin` falls back to `"system"`
-  # (persisted as `user_redemption_audits.change_source_origin`).
+  # Provenance is explicit at each call site via `change_source_origin` / `change_source_metadata`.
+  # Callers should pass values from the current execution context (api request, background job, seeds, etc).
   class Audit
-    # Persists one audit row. Provenance: optional kwargs and/or `assign_change_source_origin`; otherwise `"system"`.
+    # Queue audit persistence so redemptions can still process if audit insertion fails transiently.
+    # If the job exhausts retries, we log payload details so compliance reconciliation can run later.
     def self.record(
       redemption:,
       change_reason:,
-      change_source_origin: nil,
+      change_source_origin: "system",
       change_source_metadata: {},
       point_transaction: nil
     )
-      resolved = resolve_change_source_origin(change_source_origin: change_source_origin, redemption: redemption)
-      merged_metadata = merge_change_source_metadata(
+      payload = build_payload(
         redemption: redemption,
-        change_source_metadata: change_source_metadata
+        change_reason: change_reason,
+        change_source_origin: change_source_origin,
+        change_source_metadata: change_source_metadata,
+        point_transaction: point_transaction
       )
-
-      audit = User::RedemptionAudit.new(
-        redemption: redemption,
-        user: redemption.user,
-        reward: redemption.reward,
-        point_transaction: point_transaction,
-        request_id: redemption.idempotency_key,
-        change_source_origin: resolved,
-        change_reason: change_reason.to_s,
-        snapshot: snapshot_for(redemption),
-        metadata: merged_metadata
-      )
-
-      begin
-        audit.save!
-      rescue ActiveRecord::RecordInvalid
-        Rails.logger.error(
-          "[redemption.audit] persist_failed redemption_id=#{redemption.id} " \
-          "change_reason=#{change_reason} errors=#{audit.errors.full_messages.join(', ')}"
-        )
+      # Enqueue only after DB commit so rolled-back transactions do not emit phantom audit jobs.
+      ActiveRecord.after_all_transactions_commit do
+        begin
+          enqueue_payload(payload)
+        rescue StandardError => e
+          Rails.logger.error(
+            "[redemption.audit] enqueue_failed redemption_id=#{redemption.id} " \
+            "change_reason=#{change_reason} error=#{e.class}: #{e.message}"
+          )
+        end
       end
-      audit
+      payload
     end
 
     def self.snapshot_for(redemption)
+      redemption.as_json(
+        only: %i[
+          id
+          user_id
+          reward_id
+          status
+          points_cost_snapshot
+          idempotency_key
+        ]
+      )
+    end
+
+    def self.build_payload(redemption:, change_reason:, change_source_origin:, change_source_metadata:, point_transaction:)
       {
-        id: redemption.id,
+        user_redemption_id: redemption.id,
         user_id: redemption.user_id,
         reward_id: redemption.reward_id,
-        status: redemption.status,
-        points_cost_snapshot: redemption.points_cost_snapshot,
-        idempotency_key: redemption.idempotency_key
+        point_transaction_id: point_transaction&.id,
+        request_id: redemption.idempotency_key,
+        event_at: Time.current.iso8601(6),
+        change_source_origin: change_source_origin.to_s,
+        change_reason: change_reason.to_s,
+        snapshot: snapshot_for(redemption),
+        metadata: change_source_metadata.deep_stringify_keys
       }
     end
 
-    # Pick first non-blank origin: explicit arg -> redemption value -> "system".
-    def self.resolve_change_source_origin(change_source_origin:, redemption:)
-      (
-        change_source_origin.presence ||
-        redemption.try(:change_source_origin).presence ||
-        "system"
-      ).to_s
+    def self.enqueue_payload(payload)
+      User::Redemptions::AuditJob.perform_async(payload.deep_stringify_keys)
     end
-
-    # Merge metadata in this order:
-    # 1) base metadata already attached to the redemption
-    # 2) metadata passed into this method (overrides duplicate keys)
-    def self.merge_change_source_metadata(redemption:, change_source_metadata:)
-      base_metadata = metadata_from_redemption(redemption)
-      call_metadata = change_source_metadata.deep_stringify_keys
-      base_metadata.merge(call_metadata)
-    end
-
-    def self.metadata_from_redemption(redemption)
-      return {} unless redemption.respond_to?(:change_source_metadata)
-
-      redemption.change_source_metadata || {}
-    end
-
-    private_class_method :resolve_change_source_origin,
-                         :merge_change_source_metadata,
-                         :metadata_from_redemption
+    private_class_method :build_payload, :enqueue_payload
   end
 end

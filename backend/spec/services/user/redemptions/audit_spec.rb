@@ -14,66 +14,59 @@ RSpec.describe User::Redemptions::Audit do
       )
     end
 
-    it "uses explicit change_source_origin and merges metadata with precedence to method args" do
-      redemption.assign_change_source_origin(
-        change_source_origin: "api_request",
-        change_source_metadata: { "base" => "from_redemption", "shared" => "redemption" }
-      )
+    before do
+      allow(ActiveRecord).to receive(:after_all_transactions_commit).and_yield
+      allow(User::Redemptions::AuditJob).to receive(:perform_async) do |payload|
+        User::Redemptions::AuditJob.new.perform(payload.deep_stringify_keys)
+      end
+    end
 
-      audit = described_class.record(
+    it "uses explicit change_source_origin and persists provided metadata" do
+      payload = described_class.record(
         redemption: redemption,
         change_reason: "updated",
         change_source_origin: "background_job",
         change_source_metadata: { "shared" => "call", "extra" => "value" }
       )
 
-      expect(audit).to be_persisted
+      expect(payload).to include(change_source_origin: "background_job")
+      expect(payload[:event_at]).to be_present
+      audit = redemption.audits.order(:id).last
+      expect(audit).to be_present
       expect(audit.change_source_origin).to eq("background_job")
+      expect(audit.event_at.iso8601(6)).to eq(payload.fetch(:event_at))
       expect(audit.metadata).to eq(
-        "base" => "from_redemption",
         "shared" => "call",
         "extra" => "value"
       )
     end
 
-    it "falls back to redemption.change_source_origin when explicit origin is missing" do
-      redemption.assign_change_source_origin(change_source_origin: "api_request", change_source_metadata: {})
-
-      audit = described_class.record(
+    it "falls back to system when origin is omitted" do
+      payload = described_class.record(
         redemption: redemption,
         change_reason: "updated"
       )
 
-      expect(audit).to be_persisted
-      expect(audit.change_source_origin).to eq("api_request")
-    end
-
-    it "falls back to system when neither explicit nor redemption origin exists" do
-      redemption.change_source_origin = nil
-      redemption.change_source_metadata = nil
-
-      audit = described_class.record(
-        redemption: redemption,
-        change_reason: "updated"
-      )
-
-      expect(audit).to be_persisted
+      expect(payload).to include(change_source_origin: "system")
+      audit = redemption.audits.order(:id).last
+      expect(audit).to be_present
       expect(audit.change_source_origin).to eq("system")
       expect(audit.metadata).to eq({})
     end
 
-    it "logs and returns an unsaved audit when validations fail" do
+    it "logs and skips persistence when job enqueue fails" do
       allow(Rails.logger).to receive(:error)
+      allow(User::Redemptions::AuditJob).to receive(:perform_async).and_raise(StandardError, "redis down")
 
-      audit = described_class.record(
+      payload = described_class.record(
         redemption: redemption,
         change_reason: "invalid_reason",
         change_source_origin: "api_request"
       )
 
-      expect(audit).not_to be_persisted
-      expect(audit.errors[:change_reason]).to include("is not included in the list")
-      expect(Rails.logger).to have_received(:error).with(include("[redemption.audit] persist_failed"))
+      expect(payload).to include(change_reason: "invalid_reason")
+      expect(redemption.audits).to be_empty
+      expect(Rails.logger).to have_received(:error).with(include("[redemption.audit] enqueue_failed"))
     end
   end
 
@@ -84,12 +77,12 @@ RSpec.describe User::Redemptions::Audit do
       snapshot = described_class.snapshot_for(redemption)
 
       expect(snapshot).to eq(
-        id: redemption.id,
-        user_id: redemption.user_id,
-        reward_id: redemption.reward_id,
-        status: redemption.status,
-        points_cost_snapshot: redemption.points_cost_snapshot,
-        idempotency_key: redemption.idempotency_key
+        "id" => redemption.id,
+        "user_id" => redemption.user_id,
+        "reward_id" => redemption.reward_id,
+        "status" => redemption.status,
+        "points_cost_snapshot" => redemption.points_cost_snapshot,
+        "idempotency_key" => redemption.idempotency_key
       )
     end
   end

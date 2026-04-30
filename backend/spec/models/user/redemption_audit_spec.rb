@@ -20,6 +20,7 @@ RSpec.describe User::RedemptionAudit, type: :model do
         user: user,
         reward: reward,
         request_id: redemption.idempotency_key,
+        event_at: Time.current,
         change_source_origin: "api_request",
         change_reason: change_reason,
         snapshot: { status: redemption.status }
@@ -35,6 +36,7 @@ RSpec.describe User::RedemptionAudit, type: :model do
       user: user,
       reward: reward,
       request_id: redemption.idempotency_key,
+      event_at: Time.current,
       change_source_origin: "api_request",
       change_reason: "deleted",
       snapshot: { status: redemption.status }
@@ -50,6 +52,7 @@ RSpec.describe User::RedemptionAudit, type: :model do
       user: user,
       reward: reward,
       request_id: redemption.idempotency_key,
+      event_at: Time.current,
       change_source_origin: "admin_console",
       change_reason: "updated",
       snapshot: { status: redemption.status }
@@ -65,6 +68,7 @@ RSpec.describe User::RedemptionAudit, type: :model do
       user: user,
       reward: reward,
       request_id: redemption.idempotency_key,
+      event_at: Time.current,
       change_source_origin: "api_request",
       change_reason: "updated",
       snapshot: nil
@@ -80,6 +84,7 @@ RSpec.describe User::RedemptionAudit, type: :model do
       user: user,
       reward: reward,
       request_id: redemption.idempotency_key,
+      event_at: Time.current,
       change_source_origin: "background_job",
       change_reason: "updated",
       snapshot: { status: redemption.status },
@@ -95,6 +100,7 @@ RSpec.describe User::RedemptionAudit, type: :model do
       user: user,
       reward: reward,
       request_id: nil,
+      event_at: nil,
       change_source_origin: nil,
       change_reason: "updated",
       snapshot: { status: redemption.status }
@@ -102,6 +108,7 @@ RSpec.describe User::RedemptionAudit, type: :model do
 
     expect(audit).not_to be_valid
     expect(audit.errors[:request_id]).to include("can't be blank")
+    expect(audit.errors[:event_at]).to include("can't be blank")
     expect(audit.errors[:change_source_origin]).to include("can't be blank")
   end
 end

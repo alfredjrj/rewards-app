@@ -1,10 +1,9 @@
 module User::Redemptions
-  # Completes a reserved redemption by debiting points and marking it completed.
+  # Completes a previously reserved redemption by debiting points and marking it completed.
   # Supports idempotent replay and terminal-state short-circuiting.
   #
-  # `points_cost_snapshot` is set at reservation (or on first create) and is never
-  # overwritten here if the reward is repriced before the job runs — the debit uses
-  # the snapshot, not `reward.points_cost`.
+  # Reservation (`processing` row creation) is owned by PlaceCreditHoldAndEnqueue.
+  # This service only finalizes an existing reservation using the snapshot cost.
   class Create
     TERMINAL_STATUSES = %w[completed failed cancelled].freeze
     Result = Struct.new(:success?, :redemption, :points_balance, :point_transaction, :error, keyword_init: true)
@@ -25,14 +24,14 @@ module User::Redemptions
       existing_redemption = find_existing_redemption
       replay_result = terminal_replay_result_for(existing_redemption)
       return replay_result if replay_result
+      return reservation_missing_result unless existing_redemption
       return reward_unavailable_result unless reward.is_available?
 
-      redemption = existing_redemption || build_redemption
-      points_result = complete_redemption!(redemption)
+      points_result = complete_redemption!(existing_redemption)
       return failure_from_points_result(points_result) unless points_result.success?
 
       success(
-        redemption,
+        existing_redemption,
         points_result.transaction.running_balance,
         points_result.transaction
       )
@@ -66,40 +65,21 @@ module User::Redemptions
       failure("reward_unavailable", "Reward is not available for redemption")
     end
 
-    def build_redemption
-      User::Redemption.new(user: user, idempotency_key: idempotency_key)
+    def reservation_missing_result
+      failure("reservation_missing", "Redemption reservation was not found")
     end
 
     def complete_redemption!(redemption)
       points_result = nil
-
-      redemption.assign_change_source_origin(
-        change_source_origin: change_source_origin,
-        change_source_metadata: change_source_metadata
-      )
-
-      # Nested transaction so per-save audit callbacks run when an outer spec/job has an open transaction.
+      # Nested transaction keeps redemption + ledger writes atomic under outer transactions.
       ActiveRecord::Base.transaction(requires_new: true) do
-        persist_redemption_snapshot!(redemption)
         points_result = create_points_debit_for(redemption)
         raise ActiveRecord::Rollback unless points_result.success?
 
-        mark_redemption_completed!(redemption)
+        mark_redemption_completed!(redemption, point_transaction: points_result.transaction)
       end
 
       points_result
-    end
-
-    def persist_redemption_snapshot!(redemption)
-      return unless redemption.new_record?
-
-      redemption.assign_attributes(
-        reward: reward,
-        points_cost_snapshot: reward.points_cost,
-        # Avoid DB default `completed` so the completion step is a real update (audit + ledger semantics).
-        status: "processing"
-      )
-      redemption.save!
     end
 
     def create_points_debit_for(redemption)
@@ -114,8 +94,21 @@ module User::Redemptions
       )
     end
 
-    def mark_redemption_completed!(redemption)
-      redemption.update!(status: "completed")
+    def mark_redemption_completed!(redemption, point_transaction:)
+      transitioned = redemption.complete!
+      raise ActiveRecord::RecordInvalid.new(redemption) unless transitioned
+
+      record_audit_for(redemption, change_reason: "updated", point_transaction: point_transaction)
+    end
+
+    def record_audit_for(redemption, change_reason:, point_transaction: nil)
+      User::Redemptions::Audit.record(
+        redemption: redemption,
+        change_reason: change_reason,
+        change_source_origin: change_source_origin,
+        change_source_metadata: change_source_metadata,
+        point_transaction: point_transaction
+      )
     end
 
     def current_points_balance
