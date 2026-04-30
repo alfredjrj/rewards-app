@@ -41,11 +41,11 @@ module User::Redemptions
         idempotency_key: idempotency_key,
         flow: validation_flow
       )
-      return result_from_validation(validation) if validation.halt?
-
-      if reservation_mode == :required
-        finalize_with_reservation!(validation.existing_redemption)
+      if validation.halt?
+        result_from_validation(validation)
       else
+        return finalize_with_reservation!(validation.existing_redemption) if reservation_mode == :required
+
         finalize_without_reservation!
       end
     rescue ActiveRecord::RecordInvalid => e
@@ -69,15 +69,22 @@ module User::Redemptions
     end
 
     def result_from_validation(validation)
-      return build_result(success: true, redemption: validation.existing_redemption, points_balance: validation.points_balance, error: nil) if validation.success?
-
-      build_result(
-        success: false,
-        error: {
-          code: validation.error_code,
-          message: validation.error_message
-        }.compact
-      )
+      if validation.success?
+        build_result(
+          success: true,
+          redemption: validation.existing_redemption,
+          points_balance: validation.points_balance,
+          error: nil
+        )
+      else
+        build_result(
+          success: false,
+          error: {
+            code: validation.error_code,
+            message: validation.error_message
+          }.compact
+        )
+      end
     end
 
     # Sync path: finalize immediately with no pre-existing reservation row.
@@ -121,15 +128,17 @@ module User::Redemptions
         redemption = yield(points_result)
       end
 
-      return build_result(success: false, error: points_result.error) unless points_result.success?
-
-      build_result(
-        success: true,
-        redemption: redemption,
-        points_balance: points_result.transaction.running_balance,
-        point_transaction: points_result.transaction,
-        error: nil
-      )
+      if points_result.success?
+        build_result(
+          success: true,
+          redemption: redemption,
+          points_balance: points_result.transaction.running_balance,
+          point_transaction: points_result.transaction,
+          error: nil
+        )
+      else
+        build_result(success: false, error: points_result.error)
+      end
     end
 
     def mark_redemption_completed!(redemption, point_transaction:)

@@ -8,8 +8,8 @@ module User::Redemptions
 
     def self.mark(user_id:, request_id:, status:, change_source_origin: "system", change_source_metadata: {})
       redemption = User::Redemption.find_by(user_id: user_id, idempotency_key: request_id)
-      return false unless redemption
       event = STATUS_EVENTS[status.to_s]
+      return false unless redemption
       return false unless event
       return false unless redemption.public_send("may_#{event}?")
 

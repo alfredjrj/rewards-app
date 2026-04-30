@@ -12,6 +12,8 @@
 - Expose a single entrypoint (`.call`) and keep constructor arguments explicit.
 - Keep services idempotent where applicable (e.g. handle duplicate idempotency keys safely).
 - Put locking/transaction boundaries in services when consistency matters.
+- Prefer ternary operators for simple value selection (`condition ? a : b`), and use explicit `if/else` for multi-step control flow.
+- When explicit `if/else` creates deep nesting, prefer guard-return style (`return unless`, `return if`) to keep control flow flat and readable.
 - Prefer standardized service results over ad-hoc exceptions:
   - `success?` boolean
   - `transaction`/`data` on success

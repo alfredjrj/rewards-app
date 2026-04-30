@@ -20,14 +20,16 @@ module User::Redemptions
 
     def call
       reserve_result = reserve_pending_redemption
-      return reserve_result unless reserve_result.success?
-
-      @redemption = reserve_result.redemption
-      if reserve_result.reserved_new?
-        enqueue_async_fulfillment!
-        success(@redemption, reserved_new: true)
+      if reserve_result.success?
+        @redemption = reserve_result.redemption
+        if reserve_result.reserved_new?
+          enqueue_async_fulfillment!
+          success(@redemption, reserved_new: true)
+        else
+          success(@redemption, reserved_new: false)
+        end
       else
-        success(@redemption, reserved_new: false)
+        reserve_result
       end
     rescue StandardError => e
       Rails.logger.warn(e.full_message)
@@ -49,10 +51,15 @@ module User::Redemptions
     def reserve_pending_redemption
       user.with_lock do
         existing_redemption = user.redemptions.find_by(idempotency_key: idempotency_key)
-        return success(existing_redemption, reserved_new: false) if existing_redemption
-        return insufficient_balance_failure unless sufficient_points_available?
-
-        success(create_processing_redemption, reserved_new: true)
+        if existing_redemption
+          success(existing_redemption, reserved_new: false)
+        else
+          if sufficient_points_available?
+            success(create_processing_redemption, reserved_new: true)
+          else
+            insufficient_balance_failure
+          end
+        end
       end
     end
 
@@ -85,21 +92,23 @@ module User::Redemptions
     end
 
     def mark_failed(redemption, metadata:)
-      return unless redemption
-
-      transitioned = redemption.fail!
-      if transitioned
-        User::Redemptions::Audit.record_async(
-          redemption: redemption,
-          change_reason: "updated",
-          change_source_origin: change_source_origin,
-          change_source_metadata: metadata
-        )
+      if redemption
+        transitioned = redemption.fail!
+        if transitioned
+          User::Redemptions::Audit.record_async(
+            redemption: redemption,
+            change_reason: "updated",
+            change_source_origin: change_source_origin,
+            change_source_metadata: metadata
+          )
+        else
+          Rails.logger.error(
+            "[redemption.place_credit_hold_and_reserve] transition_failed redemption_id=#{redemption.id} " \
+            "from=#{redemption.status} to=failed"
+          )
+        end
       else
-        Rails.logger.error(
-          "[redemption.place_credit_hold_and_reserve] transition_failed redemption_id=#{redemption.id} " \
-          "from=#{redemption.status} to=failed"
-        )
+        nil
       end
     end
 

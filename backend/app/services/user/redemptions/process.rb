@@ -37,7 +37,8 @@ module User::Redemptions
       change_source_origin: "background_job",
       change_source_metadata: {}
     )
-      return if user_id.blank? || request_id.blank?
+      return unless user_id.present? && request_id.present?
+
       updated = User::Redemptions::StatusTransition.mark(
         user_id: user_id,
         request_id: request_id,
@@ -84,9 +85,11 @@ module User::Redemptions
           change_source_metadata: change_source_metadata
         )
 
-        return handle_create_success(user, reward, result) if result.success?
-
-        handle_create_failure(user, reward, result)
+        if result.success?
+          handle_create_success(user, reward, result)
+        else
+          handle_create_failure(user, reward, result)
+        end
       rescue ActiveRecord::RecordNotFound => exception
         handle_record_not_found(exception)
       rescue StandardError => exception
@@ -126,10 +129,12 @@ module User::Redemptions
     end
 
     def raise_transient_failure_if_needed(exception)
-      return unless transient_infrastructure_error?(exception)
-
-      log :warn, "transient_failure", error: "#{exception.class}: #{exception.message}"
-      raise TransientFailure, exception.message
+      if transient_infrastructure_error?(exception)
+        log :warn, "transient_failure", error: "#{exception.class}: #{exception.message}"
+        raise TransientFailure, exception.message
+      else
+        nil
+      end
     end
 
     def publish_status(user_id:, reward_id:, status:, error:)
@@ -159,9 +164,11 @@ module User::Redemptions
     end
 
     def transient_infrastructure_error?(exception)
-      return true if INFRA_TRANSIENT_EXCEPTIONS.any? { |klass| exception.is_a?(klass) }
-
-      defined?(Redis::BaseConnectionError) && exception.is_a?(Redis::BaseConnectionError)
+      if INFRA_TRANSIENT_EXCEPTIONS.any? { |klass| exception.is_a?(klass) }
+        true
+      else
+        defined?(Redis::BaseConnectionError) && exception.is_a?(Redis::BaseConnectionError)
+      end
     end
 
     def log(level, event, user_id: nil, reward_id: nil, error: nil)
