@@ -1,6 +1,12 @@
 module User::Redemptions
-  # Runs async redemption after reservation: CreateWithReservation + publish status for polling/cable.
-  # Raises TransientFailure when Sidekiq should retry (infra or internal_error from CreateWithReservation).
+  # Async orchestrator used by `ProcessJob`.
+  #
+  # Responsibilities:
+  # - load entities and call `Create` in reservation-required mode
+  # - classify failures as retryable vs terminal
+  # - publish request status updates for polling/ActionCable consumers
+  #
+  # Raises `TransientFailure` when Sidekiq should retry.
   class Process
     TransientFailure = Class.new(StandardError)
 
@@ -69,10 +75,11 @@ module User::Redemptions
         user = User.find(user_id)
         reward = Reward.find(reward_id)
 
-        result = User::Redemptions::CreateWithReservation.call(
+        result = User::Redemptions::Create.call(
           user: user,
           reward: reward,
           idempotency_key: request_id,
+          reservation_mode: :required,
           change_source_origin: change_source_origin,
           change_source_metadata: change_source_metadata
         )

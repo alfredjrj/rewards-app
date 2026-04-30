@@ -2,7 +2,6 @@ class User::Redemption < ApplicationRecord
   include AASM
 
   STATUSES = %w[processing completed failed cancelled].freeze
-  TERMINAL_STATUSES = %w[completed failed cancelled].freeze
 
   belongs_to :user
   belongs_to :reward
@@ -21,6 +20,10 @@ class User::Redemption < ApplicationRecord
   validates :points_cost_snapshot, numericality: { only_integer: true, greater_than_or_equal_to: 0 }
   validates :status, inclusion: { in: STATUSES }
   validates :idempotency_key, presence: true, uniqueness: { scope: :user_id }
+
+  def finalized?
+    completed? || failed? || cancelled?
+  end
 
   aasm column: :status, whiny_transitions: false do
     state :processing, initial: true

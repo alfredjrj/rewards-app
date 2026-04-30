@@ -287,9 +287,18 @@ base_point_transactions_seed = [
 ]
 
 base_point_transactions_seed.each do |attrs|
-  running_balance += attrs[:amount]
-  tx = User::PointTransaction.find_or_initialize_by(user: user, idempotency_key: attrs[:idempotency_key])
-  tx.update!(attrs.merge(running_balance: running_balance))
+  tx = User::PointTransaction.find_by(user: user, idempotency_key: attrs[:idempotency_key])
+  if tx
+    running_balance = tx.running_balance
+  else
+    running_balance += attrs[:amount]
+    tx = User::PointTransaction.create!(
+      attrs.merge(
+        user: user,
+        running_balance: running_balance
+      )
+    )
+  end
   puts "Point transaction seeded: #{tx.kind} #{tx.amount} (balance: #{tx.running_balance})"
 end
 
@@ -325,18 +334,23 @@ user_redemptions_seed.each do |attrs|
       change_source_metadata: {}
     )
 
-    redeem_amount = -reward.points_cost
-    running_balance += redeem_amount
-
-    tx = User::PointTransaction.find_or_initialize_by(user: user, idempotency_key: attrs[:idempotency_key])
-    tx.update!(
-      amount: redeem_amount,
-      running_balance: running_balance,
-      kind: "redeem",
-      reason_code: "reward_redemption",
-      reason: "Redeemed #{reward.title}",
-      source: redemption
-    )
+    tx = User::PointTransaction.find_by(user: user, idempotency_key: attrs[:idempotency_key])
+    if tx
+      running_balance = tx.running_balance
+    else
+      redeem_amount = -reward.points_cost
+      running_balance += redeem_amount
+      tx = User::PointTransaction.create!(
+        user: user,
+        idempotency_key: attrs[:idempotency_key],
+        amount: redeem_amount,
+        running_balance: running_balance,
+        kind: "redeem",
+        reason_code: "reward_redemption",
+        reason: "Redeemed #{reward.title}",
+        source: redemption
+      )
+    end
 
     puts "Redemption seeded: #{redemption.id} #{reward.title} (balance: #{running_balance})"
   end

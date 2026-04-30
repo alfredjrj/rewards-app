@@ -1,7 +1,8 @@
 module User::Redemptions
-  # Async redemption orchestrator:
-  # 1) reserve pending redemption + credit hold
-  # 2) enqueue async processing for external providers
+  # External-provider entrypoint used by the controller.
+  #
+  # It reserves a processing redemption (credit hold semantics) and enqueues async
+  # finalization exactly once per idempotency key.
   class PlaceCreditHoldAndReserve
     Result = Struct.new(:success?, :error, :redemption, :reserved_new?, keyword_init: true)
 
@@ -22,10 +23,12 @@ module User::Redemptions
       return reserve_result unless reserve_result.success?
 
       @redemption = reserve_result.redemption
-      return success(@redemption, reserved_new: false) unless reserve_result.reserved_new?
-
-      enqueue_async_fulfillment!
-      success(@redemption, reserved_new: true)
+      if reserve_result.reserved_new?
+        enqueue_async_fulfillment!
+        success(@redemption, reserved_new: true)
+      else
+        success(@redemption, reserved_new: false)
+      end
     rescue StandardError => e
       Rails.logger.warn(e.full_message)
       mark_failed(

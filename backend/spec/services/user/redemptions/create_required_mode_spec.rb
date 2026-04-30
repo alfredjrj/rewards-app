@@ -1,6 +1,6 @@
 require "rails_helper"
 
-RSpec.describe User::Redemptions::CreateWithReservation do
+RSpec.describe User::Redemptions::Create, "with reservation_mode: :required" do
   describe ".call" do
     let(:user) { create(:user) }
     let(:reward) { create(:reward, points_cost: 120) }
@@ -23,7 +23,7 @@ RSpec.describe User::Redemptions::CreateWithReservation do
     end
 
     it "returns reservation_missing when processing redemption is not reserved first" do
-      result = described_class.call(user: user, reward: reward, idempotency_key: idempotency_key)
+      result = described_class.call(user: user, reward: reward, idempotency_key: idempotency_key, reservation_mode: :required)
 
       expect(result.success?).to be(false)
       expect(result.error).to eq(
@@ -43,8 +43,8 @@ RSpec.describe User::Redemptions::CreateWithReservation do
         status: "processing",
         idempotency_key: idempotency_key
       )
-      first = described_class.call(user: user, reward: reward, idempotency_key: idempotency_key)
-      second = described_class.call(user: user, reward: reward, idempotency_key: idempotency_key)
+      first = described_class.call(user: user, reward: reward, idempotency_key: idempotency_key, reservation_mode: :required)
+      second = described_class.call(user: user, reward: reward, idempotency_key: idempotency_key, reservation_mode: :required)
 
       expect(first.success?).to be(true)
       expect(second.success?).to be(true)
@@ -63,7 +63,7 @@ RSpec.describe User::Redemptions::CreateWithReservation do
       )
       reward.update!(is_available: false)
 
-      result = described_class.call(user: user, reward: reward, idempotency_key: idempotency_key)
+      result = described_class.call(user: user, reward: reward, idempotency_key: idempotency_key, reservation_mode: :required)
 
       expect(result.success?).to be(false)
       expect(result.error).to include(code: "reward_unavailable")
@@ -79,7 +79,7 @@ RSpec.describe User::Redemptions::CreateWithReservation do
         idempotency_key: idempotency_key
       )
 
-      result = described_class.call(user: user, reward: reward, idempotency_key: idempotency_key)
+      result = described_class.call(user: user, reward: reward, idempotency_key: idempotency_key, reservation_mode: :required)
 
       expect(result.success?).to be(false)
       expect(result.error).to include(code: "insufficient_balance")
@@ -100,7 +100,7 @@ RSpec.describe User::Redemptions::CreateWithReservation do
         ActiveRecord::RecordInvalid.new(User::Redemption.new)
       )
 
-      result = described_class.call(user: user, reward: reward, idempotency_key: idempotency_key)
+      result = described_class.call(user: user, reward: reward, idempotency_key: idempotency_key, reservation_mode: :required)
 
       expect(result.success?).to be(false)
       expect(result.error).to include(code: "validation_error")
@@ -118,7 +118,7 @@ RSpec.describe User::Redemptions::CreateWithReservation do
         idempotency_key: idempotency_key
       )
 
-      result = described_class.call(user: user, reward: reward, idempotency_key: idempotency_key)
+      result = described_class.call(user: user, reward: reward, idempotency_key: idempotency_key, reservation_mode: :required)
 
       expect(result.success?).to be(true)
       expect(result.redemption.id).to eq(processing.id)
@@ -145,7 +145,7 @@ RSpec.describe User::Redemptions::CreateWithReservation do
 
       reward.update!(points_cost: 999)
 
-      result = described_class.call(user: user, reward: reward, idempotency_key: idempotency_key)
+      result = described_class.call(user: user, reward: reward, idempotency_key: idempotency_key, reservation_mode: :required)
 
       expect(result.success?).to be(true)
       expect(processing.reload.points_cost_snapshot).to eq(100)
@@ -164,7 +164,7 @@ RSpec.describe User::Redemptions::CreateWithReservation do
         idempotency_key: idempotency_key
       )
 
-      result = described_class.call(user: user, reward: reward, idempotency_key: idempotency_key)
+      result = described_class.call(user: user, reward: reward, idempotency_key: idempotency_key, reservation_mode: :required)
 
       expect(result.success?).to be(false)
       expect(result.error).to eq(
@@ -186,7 +186,7 @@ RSpec.describe User::Redemptions::CreateWithReservation do
         idempotency_key: idempotency_key
       )
 
-      result = described_class.call(user: user, reward: reward, idempotency_key: idempotency_key)
+      result = described_class.call(user: user, reward: reward, idempotency_key: idempotency_key, reservation_mode: :required)
 
       expect(result.success?).to be(false)
       expect(result.error).to eq(
@@ -210,7 +210,7 @@ RSpec.describe User::Redemptions::CreateWithReservation do
       allow(User::PointTransactions::Create).to receive(:call).and_raise(NoMethodError, "boom")
 
       expect do
-        described_class.call(user: user, reward: reward, idempotency_key: idempotency_key)
+        described_class.call(user: user, reward: reward, idempotency_key: idempotency_key, reservation_mode: :required)
       end.to raise_error(NoMethodError, "boom")
     end
 
@@ -226,7 +226,7 @@ RSpec.describe User::Redemptions::CreateWithReservation do
       allow(User::Redemptions::AuditJob).to receive(:perform_async)
       allow_any_instance_of(User::Redemption).to receive(:complete!).and_return(false)
 
-      result = described_class.call(user: user, reward: reward, idempotency_key: idempotency_key)
+      result = described_class.call(user: user, reward: reward, idempotency_key: idempotency_key, reservation_mode: :required)
 
       expect(result.success?).to be(false)
       expect(result.error).to include(code: "validation_error")

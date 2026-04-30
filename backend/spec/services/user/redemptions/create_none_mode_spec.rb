@@ -1,6 +1,6 @@
 require "rails_helper"
 
-RSpec.describe User::Redemptions::Create do
+RSpec.describe User::Redemptions::Create, "with reservation_mode: :none" do
   describe ".call" do
     let(:user) { create(:user) }
     let(:reward) { create(:reward, points_cost: 120, fulfillment_provider: "internal") }

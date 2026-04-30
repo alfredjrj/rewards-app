@@ -107,7 +107,7 @@ At this stage:
 
 ### 2) Async processor finalizes redemption
 
-`User::Redemptions::ProcessJob` runs `User::Redemptions::Process`, which calls `User::Redemptions::CreateWithReservation`.
+`User::Redemptions::ProcessJob` runs `User::Redemptions::Process`, which calls `User::Redemptions::Create` with `reservation_mode: :required`.
 
 Inside the finalize transaction:
 
