@@ -3,24 +3,19 @@ module User::Redemptions
   #
   # It reserves a processing redemption (credit hold semantics) and enqueues async
   # finalization exactly once per idempotency key.
-  class PlaceCreditHoldAndReserve
+  class PlaceCreditHoldAndReserve < ApplicationService
+    include Auditable
     ENQUEUE_TRANSIENT_EXCEPTIONS = [
       (Redis::BaseConnectionError if defined?(Redis::BaseConnectionError)),
       (Sidekiq::Shutdown if defined?(Sidekiq::Shutdown))
     ].compact.freeze
 
-    Result = Struct.new(:success?, :error, :redemption, :reserved_new?, keyword_init: true)
-
-    def self.call(...)
-      new(...).call
-    end
 
     def initialize(user:, reward:, idempotency_key:, change_source_origin: "system", change_source_metadata: {})
       @user = user
       @reward = reward
       @idempotency_key = idempotency_key
-      @change_source_origin = change_source_origin
-      @change_source_metadata = change_source_metadata
+      @audit_context = Auditable::AuditContext.new(origin: change_source_origin, metadata: change_source_metadata)
     end
 
     def call
@@ -42,18 +37,17 @@ module User::Redemptions
       Rails.logger.warn(e.full_message)
       mark_failed(
         @redemption,
-        metadata: change_source_metadata.merge("failure" => "enqueue_unavailable")
+        metadata: audit_context.metadata.merge("failure" => RedemptionErrors::ENQUEUE_UNAVAILABLE[:code])
       )
       failure(
-        code: "enqueue_unavailable",
-        message: "Redemption queue is temporarily unavailable. Please try again.",
+        **RedemptionErrors::ENQUEUE_UNAVAILABLE,
         redemption: @redemption
       )
     end
 
     private
 
-    attr_reader :user, :reward, :idempotency_key, :change_source_origin, :change_source_metadata
+    attr_reader :user, :reward, :idempotency_key, :audit_context
 
     def reserve_pending_redemption
       user.with_lock do
@@ -84,12 +78,7 @@ module User::Redemptions
         idempotency_key: idempotency_key
       )
       redemption.save!
-      User::Redemptions::AuditAsync.call(
-        redemption: redemption,
-        change_reason: "created",
-        change_source_origin: change_source_origin,
-        change_source_metadata: change_source_metadata
-      )
+      record_audit(redemption, change_reason: "created")
       redemption
     end
 
@@ -102,12 +91,7 @@ module User::Redemptions
       if redemption
         transitioned = redemption.fail!
         if transitioned
-          User::Redemptions::AuditAsync.call(
-            redemption: redemption,
-            change_reason: "updated",
-            change_source_origin: change_source_origin,
-            change_source_metadata: metadata
-          )
+          record_audit(redemption, change_reason: "updated", extra_metadata: metadata)
         else
           Rails.logger.error(
             "[redemption.place_credit_hold_and_reserve] transition_failed redemption_id=#{redemption.id} " \
@@ -120,27 +104,22 @@ module User::Redemptions
     end
 
     def success(redemption, reserved_new:)
-      Result.new(success?: true, error: nil, redemption: redemption, reserved_new?: reserved_new)
+      ServiceResult.success(redemption: redemption, reserved_new: reserved_new, reserved_new?: reserved_new)
     end
 
     def failure(code:, message:, details: nil, redemption: nil)
-      Result.new(
-        success?: false,
-        error: {
-          code: code,
-          message: message,
-          details: details
-        }.compact,
+      ServiceResult.failure(
+        code: code,
+        message: message,
+        details: details,
         redemption: redemption,
+        reserved_new: false,
         reserved_new?: false
       )
     end
 
     def insufficient_balance_failure
-      failure(
-        code: "insufficient_balance",
-        message: "Insufficient points balance"
-      )
+      failure(**RedemptionErrors::INSUFFICIENT_BALANCE)
     end
 
     def enqueue_transient_error?(exception)

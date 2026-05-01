@@ -17,8 +17,6 @@ module User::Redemptions
       ActiveRecord::SerializationFailure
     ].freeze
 
-    RETRYABLE_SERVICE_ERROR_CODES = %w[internal_error].freeze
-
     def self.call(user_id:, reward_id:, request_id:, job_id: nil, change_source_origin: "background_job", change_source_metadata: {})
       new(
         user_id: user_id,
@@ -52,10 +50,7 @@ module User::Redemptions
         request_id: request_id,
         reward_id: reward_id,
         status: "failed",
-        error: {
-          code: "internal_error",
-          message: "Unable to redeem reward after retries"
-        }
+        error: RedemptionErrors::INTERNAL_ERROR
       }
       StatusPublisher.publish(user_id: user_id, request_id: request_id, payload: payload)
     end
@@ -160,7 +155,7 @@ module User::Redemptions
 
     def retryable_service_error?(error)
       code = error&.dig(:code)
-      code.present? && RETRYABLE_SERVICE_ERROR_CODES.include?(code)
+      code.present? && RedemptionErrors.transient?(code)
     end
 
     def transient_infrastructure_error?(exception)

@@ -19,11 +19,11 @@ export default function RewardCard({ reward, redeeming, canRedeem, onRedeem }: R
     : "";
 
   return (
-    <article className="bg-white rounded-2xl border border-purple-100 shadow-sm p-6">
+    <article className="flex h-full flex-col bg-white rounded-2xl border border-purple-100 shadow-sm p-6">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3">
           <span
-            className={`inline-flex h-14 w-14 items-center justify-center rounded-2xl ${typeMeta.accentClass}`}
+            className={`inline-flex h-16 w-16 items-center justify-center rounded-2xl ${typeMeta.accentClass}`}
             aria-hidden="true"
           >
             <RewardTypeIcon type={reward.reward_type} />
@@ -36,18 +36,20 @@ export default function RewardCard({ reward, redeeming, canRedeem, onRedeem }: R
         <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${typeMeta.badgeClass}`}>Reward</span>
       </div>
       <p className="text-gray-600 mt-2">{reward.description}</p>
-      {isExternalProvider && (
-        <p className="mt-3 inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800">
-          External provider: {formattedProvider}
-        </p>
-      )}
-      <div className="mt-4 flex items-center justify-between">
+      <div className="mt-3 min-h-6">
+        {isExternalProvider && (
+          <p className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800">
+            External provider: {formattedProvider}
+          </p>
+        )}
+      </div>
+      <div className="mt-auto flex items-center justify-between pt-4">
         <span className="text-sm text-purple-700 font-semibold">{reward.points_cost} points</span>
         <button
           type="button"
           disabled={!canRedeem || redeeming}
           onClick={() => onRedeem(reward)}
-          className="px-3 py-1.5 rounded-lg border border-purple-200 text-xs font-medium text-purple-700 disabled:opacity-50"
+          className="rounded-lg border border-purple-200 px-4 py-2 text-sm font-medium text-purple-700 disabled:opacity-50"
         >
           {redeeming ? "Redeeming..." : "Redeem"}
         </button>

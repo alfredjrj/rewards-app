@@ -22,13 +22,13 @@ export default function RedeemConfirmationModal({
   const rewardTypeMeta = getRewardTypeMeta(reward.reward_type);
 
   return (
-    <ModalDialog>
-      <p className="text-xs uppercase tracking-wide text-zinc-500">Confirm redemption</p>
+    <ModalDialog panelClassName="relative overflow-hidden rounded-2xl border border-purple-200/70 bg-gradient-to-b from-white via-white to-purple-50/80 p-6 shadow-[0_28px_65px_-28px_rgba(76,29,149,0.6)]">
+      <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">Confirm redemption</p>
       <h2 className="mt-1 text-xl font-semibold text-zinc-900">Use points for this reward?</h2>
-      <div className="mt-4 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+      <div className="mt-4 rounded-2xl border border-purple-100/80 bg-white p-4 shadow-sm">
         <div className="flex items-center gap-3">
           <span
-            className={`inline-flex h-14 w-14 items-center justify-center rounded-2xl ${rewardTypeMeta.accentClass}`}
+            className={`inline-flex h-14 w-14 items-center justify-center rounded-2xl ring-1 ring-black/5 ${rewardTypeMeta.accentClass}`}
           >
             <RewardTypeIcon type={reward.reward_type} />
           </span>
@@ -49,7 +49,7 @@ export default function RedeemConfirmationModal({
           type="button"
           onClick={onCancel}
           disabled={isSubmitting}
-          className="rounded-xl border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+          className="rounded-xl border border-zinc-300 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 transition-colors hover:bg-zinc-50 disabled:opacity-50"
         >
           Cancel
         </button>
@@ -57,7 +57,7 @@ export default function RedeemConfirmationModal({
           type="button"
           onClick={onConfirm}
           disabled={isSubmitting}
-          className="rounded-xl bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
+          className="rounded-xl bg-gradient-to-r from-violet-600 via-purple-600 to-fuchsia-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:brightness-110 disabled:opacity-50"
         >
           {isSubmitting ? "Confirming..." : "Confirm redeem"}
         </button>

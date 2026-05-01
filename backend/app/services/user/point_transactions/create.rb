@@ -5,12 +5,7 @@
 # rows plus user-level locking stays correct under concurrency; a lone counter cannot explain *why*
 # the balance changed or replay safely after partial failures.
 module User::PointTransactions
-  class Create
-    Result = Struct.new(:success?, :transaction, :error, keyword_init: true)
-
-    def self.call(...)
-      new(...).call
-    end
+  class Create < ApplicationService
 
     def initialize(user:, amount:, kind:, reason_code:, idempotency_key:, reason: nil, source: nil)
       @user = user
@@ -36,7 +31,7 @@ module User::PointTransactions
 
         current_balance = latest_running_balance
         next_balance = current_balance + amount
-        return failure("insufficient_balance", "Insufficient points balance") if next_balance.negative?
+        return failure(**RedemptionErrors::INSUFFICIENT_BALANCE) if next_balance.negative?
 
         transaction = User::PointTransaction.create!(
           user: user,
@@ -56,8 +51,7 @@ module User::PointTransactions
       log(:warn, "validation_failed", error_class: e.class.name)
       Rails.logger.warn(e.full_message)
       failure(
-        "validation_error",
-        "Point transaction is invalid",
+        **RedemptionErrors::VALIDATION_ERROR.merge(message: "Point transaction is invalid"),
         details: e.record.errors.to_hash(true)
       )
     end
@@ -75,19 +69,11 @@ module User::PointTransactions
     end
 
     def success(transaction)
-      Result.new(success?: true, transaction: transaction, error: nil)
+      ServiceResult.success(point_transaction: transaction, transaction: transaction)
     end
 
-    def failure(code, message, details: nil)
-      Result.new(
-        success?: false,
-        transaction: nil,
-        error: {
-          code: code,
-          message: message,
-          details: details
-        }.compact
-      )
+    def failure(code:, message:, details: nil)
+      ServiceResult.failure(code: code, message: message, details: details)
     end
 
     def log(level, event, extra = {})

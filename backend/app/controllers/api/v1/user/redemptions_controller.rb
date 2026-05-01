@@ -49,7 +49,7 @@ class Api::V1::User::RedemptionsController < AuthenticationController
 
     unless result.success?
       error_code = result.error&.dig(:code)
-      error_status = %w[enqueue_unavailable internal_error].include?(error_code) ? :service_unavailable : :unprocessable_entity
+      error_status = RedemptionErrors.transient?(error_code) ? :service_unavailable : :unprocessable_entity
       render_api_error(
         code: error_code || "redemption_failed",
         message: result.error&.dig(:message) || "Unable to process redemption",

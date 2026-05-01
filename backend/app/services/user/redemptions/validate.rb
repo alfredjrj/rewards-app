@@ -9,96 +9,47 @@ module User::Redemptions
   # Flows:
   # - :sync => no non-finalized existing redemption allowed
   # - :with_reservation => an existing redemption row is required
-  class Validate
+  class Validate < ApplicationService
     FLOWS = %i[sync with_reservation].freeze
 
-    Result = Struct.new(
-      :halt?,
-      :success?,
-      :existing_redemption,
-      :points_balance,
-      :error_code,
-      :error_message,
-      keyword_init: true
-    )
-
-    def self.call(...)
-      new(...).call
-    end
-
     def initialize(user:, reward:, idempotency_key:, flow:)
+      @flow = flow&.to_sym
+      raise ArgumentError, "Unknown validation flow: #{flow.inspect}" unless FLOWS.include?(@flow)
+
       @user = user
       @reward = reward
       @idempotency_key = idempotency_key
-      @flow = flow&.to_sym
     end
 
     def call
-      if FLOWS.include?(flow)
-        existing_redemption = user.redemptions.find_by(idempotency_key: idempotency_key)
+      return replay_completed_result if existing_redemption&.completed?
+      return halted_failure(existing_redemption: existing_redemption, **RedemptionErrors::REDEMPTION_FINALIZED) if existing_redemption&.finalized?
+      return halted_failure(existing_redemption: existing_redemption, **RedemptionErrors::REWARD_UNAVAILABLE) unless reward.is_available?
 
-        replay_result = result_for_finalized_redemption(existing_redemption)
-        if replay_result
-          replay_result
-        else
-          if reward.is_available?
-            flow_precondition_result(existing_redemption)
-          else
-            reward_unavailable_result(existing_redemption)
-          end
-        end
-      else
-        raise ArgumentError, "Unknown validation flow: #{flow.inspect}"
-      end
+      flow_precondition_result
     end
 
     private
 
     attr_reader :user, :reward, :idempotency_key, :flow
 
-    def result_for_finalized_redemption(existing_redemption)
-      return nil unless existing_redemption&.finalized?
-      return replay_completed_result(existing_redemption) if existing_redemption.completed?
-
-      halted_failure(
-        existing_redemption: existing_redemption,
-        code: "redemption_finalized",
-        message: "Redemption already finalized"
-      )
+    def existing_redemption
+      @existing_redemption ||= user.redemptions.find_by(idempotency_key: idempotency_key)
     end
 
-    def reward_unavailable_result(existing_redemption)
-      halted_failure(
-        existing_redemption: existing_redemption,
-        code: "reward_unavailable",
-        message: "Reward is not available for redemption"
-      )
-    end
-
-    def flow_precondition_result(existing_redemption)
-      if flow == :sync
-        return proceed(existing_redemption) unless existing_redemption
-
-        return halted_failure(
-          existing_redemption: existing_redemption,
-          code: "redemption_in_progress",
-          message: "Redemption is currently processing"
-        )
+    def flow_precondition_result
+      case flow
+      when :sync
+        existing_redemption ? halted_failure(existing_redemption: existing_redemption, **RedemptionErrors::REDEMPTION_IN_PROGRESS) : proceed
+      when :with_reservation
+        existing_redemption ? proceed : halted_failure(existing_redemption: nil, **RedemptionErrors::RESERVATION_MISSING)
       end
-
-      return proceed(existing_redemption) if existing_redemption
-
-      halted_failure(
-        existing_redemption: nil,
-        code: "reservation_missing",
-        message: "Redemption reservation was not found"
-      )
     end
 
-    def replay_completed_result(existing_redemption)
-      Result.new(
-        halt?: true,
-        success?: true,
+    def replay_completed_result
+      ServiceResult.success(
+        halt: true,
+        redemption: existing_redemption,
         existing_redemption: existing_redemption,
         points_balance: user.current_points_balance,
         error_code: nil,
@@ -106,25 +57,25 @@ module User::Redemptions
       )
     end
 
-    def proceed(existing_redemption)
-      Result.new(
-        halt?: false,
-        success?: true,
+    def proceed
+      ServiceResult.success(
+        halt: false,
+        redemption: existing_redemption,
         existing_redemption: existing_redemption,
-        points_balance: nil,
         error_code: nil,
         error_message: nil
       )
     end
 
     def halted_failure(existing_redemption:, code:, message:)
-      Result.new(
-        halt?: true,
-        success?: false,
+      ServiceResult.failure(
+        halt: true,
+        redemption: existing_redemption,
         existing_redemption: existing_redemption,
-        points_balance: nil,
         error_code: code,
-        error_message: message
+        error_message: message,
+        code: code,
+        message: message
       )
     end
   end

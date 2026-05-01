@@ -36,6 +36,7 @@ export default function RewardsPage() {
     redeemingId,
     processingRequestId,
     pendingReward,
+    showInstantRedemptionLoader,
     redemptionSuccesses,
     closeRedeemModal,
     dismissRedemptionSuccess,
@@ -89,31 +90,31 @@ export default function RewardsPage() {
                 aria-live="polite"
                 aria-busy={pendingAmountLoading}
                 aria-label="Points held while redemption is processing"
-                className="flex min-h-[5.25rem] min-w-[12.5rem] shrink-0 flex-col justify-center self-stretch rounded-2xl border border-amber-300/90 bg-gradient-to-br from-amber-500 to-orange-600 px-6 py-4 text-white shadow-md sm:min-w-[12.5rem]"
+                className="flex min-h-[5.25rem] min-w-[16rem] shrink-0 flex-col justify-center self-stretch rounded-2xl border border-purple-200 bg-white/95 px-6 py-4 text-purple-700 shadow-lg backdrop-blur sm:min-w-[16rem]"
               >
                 <div className="flex items-center gap-4">
                   <div
-                    className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white/20"
+                    className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-purple-50"
                     aria-hidden
                   >
-                    <span className="h-6 w-6 animate-spin rounded-full border-2 border-white/35 border-t-white" />
+                    <span className="h-7 w-7 animate-spin rounded-full border-[3px] border-purple-300 border-t-purple-700" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-50/95">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-purple-500">
                       Being processed
                     </p>
                     {pendingAmountLoading ? (
                       <div
-                        className="mt-1.5 h-9 w-24 rounded-lg bg-white/25 animate-pulse"
+                        className="mt-1.5 h-9 w-24 rounded-lg bg-purple-100 animate-pulse"
                         aria-hidden
                       />
                     ) : (
                       <p className="mt-0.5 text-2xl font-bold tabular-nums leading-tight tracking-tight">
                         {pendingPts}{" "}
-                        <span className="text-base font-semibold text-amber-50/95">pts</span>
+                        <span className="text-base font-semibold text-purple-500">pts</span>
                       </p>
                     )}
-                    <p className="mt-0.5 text-[11px] leading-snug text-amber-50/90">
+                    <p className="mt-0.5 text-[11px] leading-snug text-purple-600">
                       This amount is on hold until your redemption finishes.
                     </p>
                   </div>
@@ -140,14 +141,29 @@ export default function RewardsPage() {
           </div>
         </div>
 
-        {redemptionSuccesses.map((success) => (
-          <RedemptionSuccessBanner
-            key={success.id}
-            rewardTitle={success.rewardTitle}
-            pointsSpent={success.pointsSpent}
-            onDismiss={() => dismissRedemptionSuccess(success.id)}
-          />
-        ))}
+        <div aria-live="polite" className="pointer-events-none">
+          {showInstantRedemptionLoader && (
+            <div className="pointer-events-none fixed inset-0 z-30 flex items-center justify-center">
+              <div
+                role="status"
+                aria-label="Finalizing redemption"
+                className="inline-flex items-center gap-5 rounded-full border border-purple-200 bg-white/95 px-8 py-4 text-lg font-semibold text-purple-700 shadow-xl backdrop-blur"
+              >
+                <span className="h-9 w-9 animate-spin rounded-full border-4 border-purple-300 border-t-purple-700" />
+                Finalizing...
+              </div>
+            </div>
+          )}
+          {redemptionSuccesses.map((success, index) => (
+            <RedemptionSuccessBanner
+              key={success.id}
+              rewardTitle={success.rewardTitle}
+              pointsSpent={success.pointsSpent}
+              stackIndex={index}
+              onDismiss={() => dismissRedemptionSuccess(success.id)}
+            />
+          ))}
+        </div>
 
         {pendingReward && (
           <RedeemConfirmationModal

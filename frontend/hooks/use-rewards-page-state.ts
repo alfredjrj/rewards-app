@@ -17,6 +17,7 @@ type RedemptionSuccessState = {
   rewardTitle: string;
   pointsSpent: number;
   pointsBalance: number;
+  origin?: { x: number; y: number };
 };
 
 type UseRewardsPageStateArgs = {
@@ -26,6 +27,7 @@ type UseRewardsPageStateArgs = {
 
 const PER_PAGE = 10;
 const SEARCH_DEBOUNCE_MS = 500;
+const INSTANT_REDEMPTION_FEEDBACK_MS = 420;
 
 function createIdempotencyKey(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -46,6 +48,8 @@ export function useRewardsPageState({ user, authLoading }: UseRewardsPageStateAr
   const [pendingReward, setPendingReward] = useState<Reward | null>(null);
   const [pendingIdempotencyKey, setPendingIdempotencyKey] = useState<string | null>(null);
   const [redemptionSuccesses, setRedemptionSuccesses] = useState<RedemptionSuccessState[]>([]);
+  const [showInstantRedemptionLoader, setShowInstantRedemptionLoader] = useState(false);
+  const pendingRedeemOriginRef = useRef<{ x: number; y: number } | undefined>(undefined);
   const pointsQueryKey = [ "user", "points", user?.id ] as const;
   const pointsBalanceRef = useRef(0);
   const pointsQueryKeyRef = useRef(pointsQueryKey);
@@ -130,6 +134,7 @@ export function useRewardsPageState({ user, authLoading }: UseRewardsPageStateAr
         rewardTitle: processing.rewardTitle,
         pointsSpent: processing.pointsSpent,
         pointsBalance: latestPointsBalance,
+        origin: pendingRedeemOriginRef.current,
       });
       void queryClient.invalidateQueries({ queryKey: ["rewards"] });
     },
@@ -188,6 +193,8 @@ export function useRewardsPageState({ user, authLoading }: UseRewardsPageStateAr
         }
         await queryClient.invalidateQueries({ queryKey: pointsQueryKey });
       } else if (status === "completed") {
+        setShowInstantRedemptionLoader(true);
+        await new Promise((resolve) => setTimeout(resolve, INSTANT_REDEMPTION_FEEDBACK_MS));
         const updatedPointsBalance =
           payload.data.points_balance ?? pointsBalance;
         addRedemptionSuccess({
@@ -195,36 +202,45 @@ export function useRewardsPageState({ user, authLoading }: UseRewardsPageStateAr
           rewardTitle: reward.title,
           pointsSpent: reward.points_cost,
           pointsBalance: updatedPointsBalance,
+          origin: pendingRedeemOriginRef.current,
         });
+        setShowInstantRedemptionLoader(false);
         await queryClient.invalidateQueries({ queryKey: pointsQueryKey });
       } else {
+        setShowInstantRedemptionLoader(false);
         setRedeemError("Redemption could not be completed.");
         await queryClient.invalidateQueries({ queryKey: pointsQueryKey });
       }
       await queryClient.invalidateQueries({ queryKey: ["rewards"] });
     } catch (err) {
+      setShowInstantRedemptionLoader(false);
       setRedeemError(err instanceof Error ? err.message : "Failed to redeem reward");
     } finally {
+      setShowInstantRedemptionLoader(false);
       setRedeemingId(null);
     }
   }
 
   async function confirmRedeem() {
     if (!pendingReward || !pendingIdempotencyKey) return;
-    await handleRedeem(pendingReward, pendingIdempotencyKey);
+    const reward = pendingReward;
+    const idempotencyKey = pendingIdempotencyKey;
     setPendingReward(null);
     setPendingIdempotencyKey(null);
+    await handleRedeem(reward, idempotencyKey);
   }
 
-  function openRedeemModal(reward: Reward) {
+  function openRedeemModal(reward: Reward, origin?: { x: number; y: number }) {
     setRedeemError("");
     setPendingReward(reward);
     setPendingIdempotencyKey(createIdempotencyKey());
+    pendingRedeemOriginRef.current = origin;
   }
 
   function closeRedeemModal() {
     setPendingReward(null);
     setPendingIdempotencyKey(null);
+    pendingRedeemOriginRef.current = undefined;
   }
 
   function onSearchChange(nextQuery: string) {
@@ -261,6 +277,7 @@ export function useRewardsPageState({ user, authLoading }: UseRewardsPageStateAr
     redeemingId,
     processingRequestId,
     pendingReward,
+    showInstantRedemptionLoader,
     redemptionSuccesses,
     setPendingReward,
     dismissRedemptionSuccess,
