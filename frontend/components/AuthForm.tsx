@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, ReactNode } from "react";
+import FlashMessage from "@/components/ui/flash-message";
 
 interface Props {
   title: string;
@@ -34,11 +35,7 @@ export default function AuthForm({
         </div>
 
         <div className="bg-white rounded-2xl shadow-xl p-8">
-          {error && (
-            <div className="mb-5 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
-              {error}
-            </div>
-          )}
+          {error && <FlashMessage message={error} tone="error" className="mb-5" />}
 
           <form onSubmit={onSubmit} className="space-y-5">
             {children}

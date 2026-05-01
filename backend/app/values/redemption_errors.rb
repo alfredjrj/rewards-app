@@ -31,10 +31,28 @@ module RedemptionErrors
     code: "internal_error",
     message: "Unable to redeem reward after retries"
   }.freeze
+  INTERNAL_ERROR_PUBLIC_MESSAGE = "Unable to process redemption right now. Please try again.".freeze
 
   TRANSIENT_CODES = %w[enqueue_unavailable internal_error].freeze
+  USER_VISIBLE_CODES = %w[
+    insufficient_balance
+    reward_unavailable
+    redemption_finalized
+    redemption_in_progress
+    reservation_missing
+    validation_error
+  ].freeze
+  SANITIZED_CODES = %w[enqueue_unavailable internal_error].freeze
 
   def self.transient?(code)
     TRANSIENT_CODES.include?(code.to_s)
+  end
+
+  def self.user_visible_code?(code)
+    USER_VISIBLE_CODES.include?(code.to_s)
+  end
+
+  def self.sanitized_code?(code)
+    SANITIZED_CODES.include?(code.to_s)
   end
 end

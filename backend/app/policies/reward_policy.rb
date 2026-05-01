@@ -3,7 +3,7 @@ class RewardPolicy < ApplicationPolicy
     def resolve
       return scope.none unless user.present?
 
-      scope.where(is_available: true).order(:title)
+      scope.active.where(is_available: true).order(:title)
     end
   end
 

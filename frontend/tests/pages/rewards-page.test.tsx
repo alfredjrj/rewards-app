@@ -387,4 +387,24 @@ describe("RewardsPage", () => {
     expect(redeemRewardMock).toHaveBeenCalledTimes(2);
   });
 
+  it("shows redeem error as flash while keeping rewards visible", async () => {
+    redeemRewardMock.mockResolvedValueOnce({
+      data: {
+        reward_id: 1,
+        status: "failed",
+      },
+    });
+
+    const user = userEvent.setup();
+    renderWithQueryClient(<RewardsPage />);
+
+    expect(await screen.findByText("Free Coffee")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Redeem" }));
+    await user.click(screen.getByRole("button", { name: "Confirm redeem" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Redemption could not be completed.");
+    expect(screen.getByText("Free Coffee")).toBeInTheDocument();
+  });
+
 });

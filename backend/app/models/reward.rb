@@ -12,7 +12,10 @@ class Reward < ApplicationRecord
   validates :points_cost, numericality: { greater_than_or_equal_to: 0, only_integer: true }
   validates :reward_type, inclusion: { in: TYPES }
   validates :fulfillment_provider, inclusion: { in: FULFILLMENT_PROVIDERS }
+  before_destroy :prevent_hard_delete
 
+  scope :active, -> { where(deleted_at: nil) }
+  scope :soft_deleted, -> { where.not(deleted_at: nil) }
   scope :for_types, ->(types) { where(reward_type: types) if types.present? }
   scope :by_points_cost, lambda { |min: nil, max: nil|
     scoped = all
@@ -35,5 +38,20 @@ class Reward < ApplicationRecord
 
   def sync_fulfillment?
     fulfillment_provider == "internal"
+  end
+
+  def soft_delete!
+    update!(deleted_at: Time.current, is_available: false)
+  end
+
+  def restore!
+    update!(deleted_at: nil)
+  end
+
+  private
+
+  def prevent_hard_delete
+    errors.add(:base, "Hard delete is not allowed for rewards. Use soft_delete! instead.")
+    throw :abort
   end
 end

@@ -6,6 +6,7 @@ import RewardCard from "@/components/rewards/reward-card";
 import RewardsGridSkeleton from "@/components/rewards/rewards-grid-skeleton";
 import RedeemConfirmationModal from "@/components/rewards/redeem-confirmation-modal";
 import RedemptionSuccessBanner from "@/components/rewards/redemption-success-banner";
+import FlashMessage from "@/components/ui/flash-message";
 import FilterChips from "@/components/ui/filter-chips";
 import PaginationBar from "@/components/ui/pagination-bar";
 import PageHeader from "@/components/ui/page-header";
@@ -25,6 +26,7 @@ export default function RewardsPage() {
     rewards,
     isLoading,
     error,
+    redeemError,
     query,
     selectedRewardTypes,
     affordableOnly,
@@ -40,6 +42,7 @@ export default function RewardsPage() {
     redemptionSuccesses,
     closeRedeemModal,
     dismissRedemptionSuccess,
+    dismissRedeemError,
     confirmRedeem,
     openRedeemModal,
     onSearchChange,
@@ -81,6 +84,10 @@ export default function RewardsPage() {
       <Navbar />
 
       <main className="max-w-6xl mx-auto px-6 py-10">
+        {redeemError && (
+          <FlashMessage message={redeemError} tone="error" onDismiss={dismissRedeemError} className="mb-6" />
+        )}
+
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <PageHeader title="Rewards" subtitle="Pick a reward and redeem instantly." className="mb-0" />
           <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch">

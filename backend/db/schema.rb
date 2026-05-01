@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_04_30_150000) do
+ActiveRecord::Schema[8.0].define(version: 2026_05_01_190000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -23,7 +23,9 @@ ActiveRecord::Schema[8.0].define(version: 2026_04_30_150000) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.string "fulfillment_provider", default: "internal", null: false
+    t.datetime "deleted_at"
     t.index "((setweight(to_tsvector('english'::regconfig, (COALESCE(title, ''::character varying))::text), 'A'::\"char\") || setweight(to_tsvector('english'::regconfig, COALESCE(description, ''::text)), 'B'::\"char\")))", name: "index_rewards_on_title_and_description_tsv", using: :gin
+    t.index ["deleted_at"], name: "index_rewards_on_deleted_at"
     t.index ["title"], name: "index_rewards_on_title_for_search"
     t.check_constraint "char_length(reward_type::text) > 0", name: "chk_rewards_reward_type_not_blank"
     t.check_constraint "char_length(title::text) > 0", name: "chk_rewards_title_not_blank"

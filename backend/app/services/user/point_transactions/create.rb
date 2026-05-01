@@ -51,7 +51,7 @@ module User::PointTransactions
       log(:warn, "validation_failed", error_class: e.class.name)
       Rails.logger.warn(e.full_message)
       failure(
-        **RedemptionErrors::VALIDATION_ERROR.merge(message: "Point transaction is invalid"),
+        **RedemptionErrors::VALIDATION_ERROR.merge(message: validation_message_for(e.record)),
         details: e.record.errors.to_hash(true)
       )
     end
@@ -74,6 +74,11 @@ module User::PointTransactions
 
     def failure(code:, message:, details: nil)
       ServiceResult.failure(code: code, message: message, details: details)
+    end
+
+    def validation_message_for(record)
+      message = record.errors.full_messages.to_sentence
+      message.presence || RedemptionErrors::VALIDATION_ERROR[:message]
     end
 
     def log(level, event, extra = {})

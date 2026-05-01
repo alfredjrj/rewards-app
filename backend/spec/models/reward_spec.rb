@@ -70,4 +70,31 @@ RSpec.describe Reward, type: :model do
     end
 
   end
+
+  describe "soft delete behavior" do
+    it "soft deletes by setting deleted_at and disabling availability" do
+      reward = create(:reward, is_available: true, deleted_at: nil)
+
+      reward.soft_delete!
+
+      expect(reward.deleted_at).to be_present
+      expect(reward.is_available).to be(false)
+    end
+
+    it "restores a soft-deleted reward" do
+      reward = create(:reward, is_available: false, deleted_at: 2.days.ago)
+
+      reward.restore!
+
+      expect(reward.deleted_at).to be_nil
+    end
+
+    it "blocks hard deletes" do
+      reward = create(:reward)
+
+      expect(reward.destroy).to be(false)
+      expect(reward.errors[:base]).to include("Hard delete is not allowed for rewards. Use soft_delete! instead.")
+      expect(described_class.exists?(reward.id)).to be(true)
+    end
+  end
 end

@@ -259,7 +259,8 @@ describe("useRewardsPageState", () => {
       await result.current.confirmRedeem();
     });
 
-    expect(result.current.error).toBe("Redemption could not be completed.");
+    expect(result.current.redeemError).toBe("Redemption could not be completed.");
+    expect(result.current.error).toBe("");
     expect(result.current.redemptionSuccesses).toHaveLength(0);
   });
 

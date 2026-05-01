@@ -44,7 +44,7 @@ module User::Redemptions
     rescue ActiveRecord::RecordInvalid => e
       Rails.logger.warn(e.full_message)
       ServiceResult.failure(
-        **RedemptionErrors::VALIDATION_ERROR,
+        **RedemptionErrors::VALIDATION_ERROR.merge(message: validation_message_for(e.record)),
         details: e.record.errors.to_hash(true),
         redemption: nil,
         points_balance: nil,
@@ -130,6 +130,11 @@ module User::Redemptions
 
       record_audit(redemption, change_reason: "updated", point_transaction: point_transaction)
       redemption
+    end
+
+    def validation_message_for(record)
+      message = record.errors.full_messages.to_sentence
+      message.presence || RedemptionErrors::VALIDATION_ERROR[:message]
     end
   end
 end

@@ -66,7 +66,10 @@ RSpec.describe User::Redemptions::Create, "with reservation_mode: :required" do
       result = described_class.call(user: user, reward: reward, idempotency_key: idempotency_key, reservation_mode: :required)
 
       expect(result.success?).to be(false)
-      expect(result.error).to include(code: "reward_unavailable")
+      expect(result.error).to include(
+        code: "reward_unavailable",
+        message: "Reward is not available for redemption"
+      )
     end
 
     it "returns insufficient_balance when points are not enough" do
@@ -82,7 +85,10 @@ RSpec.describe User::Redemptions::Create, "with reservation_mode: :required" do
       result = described_class.call(user: user, reward: reward, idempotency_key: idempotency_key, reservation_mode: :required)
 
       expect(result.success?).to be(false)
-      expect(result.error).to include(code: "insufficient_balance")
+      expect(result.error).to include(
+        code: "insufficient_balance",
+        message: "Insufficient points balance"
+      )
       expect(user.redemptions.count).to eq(1)
       expect(user.redemptions.find_by(idempotency_key: idempotency_key)&.status).to eq("processing")
     end
@@ -103,7 +109,10 @@ RSpec.describe User::Redemptions::Create, "with reservation_mode: :required" do
       result = described_class.call(user: user, reward: reward, idempotency_key: idempotency_key, reservation_mode: :required)
 
       expect(result.success?).to be(false)
-      expect(result.error).to include(code: "validation_error")
+      expect(result.error).to include(
+        code: "validation_error",
+        message: "Redemption is invalid"
+      )
       expect(user.point_transactions.count).to eq(1)
       expect(user.point_transactions.order(:id).last.running_balance).to eq(500)
     end
@@ -229,7 +238,10 @@ RSpec.describe User::Redemptions::Create, "with reservation_mode: :required" do
       result = described_class.call(user: user, reward: reward, idempotency_key: idempotency_key, reservation_mode: :required)
 
       expect(result.success?).to be(false)
-      expect(result.error).to include(code: "validation_error")
+      expect(result.error).to include(
+        code: "validation_error",
+        message: "Redemption is invalid"
+      )
       expect(processing.reload.status).to eq("processing")
       expect(User::Redemptions::AuditJob).not_to have_received(:perform_async)
       expect(processing.audits).to be_empty

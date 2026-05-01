@@ -48,7 +48,10 @@ RSpec.describe User::Redemptions::Create, "with reservation_mode: :none" do
       result = described_class.call(user: user, reward: expensive_reward, idempotency_key: idempotency_key)
 
       expect(result.success?).to be(false)
-      expect(result.error).to include(code: "insufficient_balance")
+      expect(result.error).to include(
+        code: "insufficient_balance",
+        message: "Insufficient points balance"
+      )
       expect(user.redemptions.where(idempotency_key: idempotency_key)).to be_empty
     end
   end

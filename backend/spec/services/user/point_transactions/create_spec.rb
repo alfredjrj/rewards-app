@@ -152,6 +152,7 @@ RSpec.describe User::PointTransactions::Create do
 
       expect(result.success?).to be(false)
       expect(result.error[:code]).to eq("validation_error")
+      expect(result.error[:message]).to eq("Reason code is not included in the list")
       expect(result.error[:details]).to include(:reason_code)
       expect(user.point_transactions.count).to eq(0)
     end

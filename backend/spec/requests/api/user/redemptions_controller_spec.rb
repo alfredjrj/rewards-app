@@ -375,6 +375,81 @@ RSpec.describe "Api::V1::User::RedemptionsController", type: :request do
         expect(user.redemptions.find_by(idempotency_key: key)).to be_nil
       end
 
+      it "surfaces enqueue_unavailable message and maps to service_unavailable" do
+        key = "9a54eaaf-b4f7-4380-9256-bc673fd3f6f0"
+        allow(User::Redemptions::PlaceCreditHoldAndReserve).to receive(:call).and_return(
+          ServiceResult.failure(**RedemptionErrors::ENQUEUE_UNAVAILABLE)
+        )
+        allow(Rails.logger).to receive(:error)
+
+        post "/api/v1/user/redemptions",
+             params: { redemption: { reward_id: reward.id } },
+             headers: { "Idempotency-Key" => key, "X-CSRF-Token" => csrf_token }
+
+        expect(response).to have_http_status(:service_unavailable)
+        expect(JSON.parse(response.body)).to eq(
+          "error" => {
+            "code" => "enqueue_unavailable",
+            "message" => "Unable to process redemption right now. Please try again."
+          }
+        )
+        expect(Rails.logger).to have_received(:error).with(include("[redemption.api] sanitized_error"))
+      end
+
+      it "surfaces validation_error message and maps to unprocessable_entity for sync path" do
+        key = "88fdc500-b7ec-40ba-9726-f4a8795ad5bc"
+        sync_reward = create(
+          :reward,
+          points_cost: 100,
+          is_available: true,
+          reward_type: "free_item",
+          fulfillment_provider: "internal"
+        )
+        allow(User::Redemptions::Create).to receive(:call).and_return(
+          ServiceResult.failure(**RedemptionErrors::VALIDATION_ERROR)
+        )
+
+        post "/api/v1/user/redemptions",
+             params: { redemption: { reward_id: sync_reward.id } },
+             headers: { "Idempotency-Key" => key, "X-CSRF-Token" => csrf_token }
+
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(JSON.parse(response.body)).to eq(
+          "error" => {
+            "code" => "validation_error",
+            "message" => "Redemption is invalid"
+          }
+        )
+      end
+
+      it "does not surface internal_error details and logs them" do
+        key = "80976512-d4bb-45ea-b7f7-1e4f14cc10d9"
+        sync_reward = create(
+          :reward,
+          points_cost: 100,
+          is_available: true,
+          reward_type: "free_item",
+          fulfillment_provider: "internal"
+        )
+        allow(User::Redemptions::Create).to receive(:call).and_return(
+          ServiceResult.failure(code: "internal_error", message: "Sensitive downstream exception")
+        )
+        allow(Rails.logger).to receive(:error)
+
+        post "/api/v1/user/redemptions",
+             params: { redemption: { reward_id: sync_reward.id } },
+             headers: { "Idempotency-Key" => key, "X-CSRF-Token" => csrf_token }
+
+        expect(response).to have_http_status(:service_unavailable)
+        expect(JSON.parse(response.body)).to eq(
+          "error" => {
+            "code" => "internal_error",
+            "message" => "Unable to process redemption right now. Please try again."
+          }
+        )
+        expect(Rails.logger).to have_received(:error).with(include("[redemption.api] sanitized_error"))
+      end
+
       it "returns forbidden when csrf token is missing" do
         key = "csfr-missing-14a3f0ff-62d9-4cc8-af5f-07d0ff67ad7b"
         allow(User::Redemptions::ProcessJob).to receive(:perform_in)

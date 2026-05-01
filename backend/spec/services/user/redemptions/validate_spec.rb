@@ -27,6 +27,28 @@ RSpec.describe User::Redemptions::Validate do
       expect(result.existing_redemption.status).to eq("completed")
     end
 
+    it "returns redemption_finalized when existing redemption is finalized but not completed" do
+      create(
+        :user_redemption,
+        user: user,
+        reward: reward,
+        status: "failed",
+        idempotency_key: idempotency_key
+      )
+
+      result = described_class.call(
+        user: user,
+        reward: reward,
+        idempotency_key: idempotency_key,
+        flow: :sync
+      )
+
+      expect(result.halt?).to be(true)
+      expect(result.success?).to be(false)
+      expect(result.error_code).to eq("redemption_finalized")
+      expect(result.error_message).to eq("Redemption already finalized")
+    end
+
     it "returns reward_unavailable before flow-specific checks" do
       reward.update!(is_available: false)
 
@@ -40,6 +62,7 @@ RSpec.describe User::Redemptions::Validate do
       expect(result.halt?).to be(true)
       expect(result.success?).to be(false)
       expect(result.error_code).to eq("reward_unavailable")
+      expect(result.error_message).to eq("Reward is not available for redemption")
     end
 
     it "returns redemption_in_progress for sync flow with existing processing redemption" do
@@ -61,6 +84,7 @@ RSpec.describe User::Redemptions::Validate do
       expect(result.halt?).to be(true)
       expect(result.success?).to be(false)
       expect(result.error_code).to eq("redemption_in_progress")
+      expect(result.error_message).to eq("Redemption is currently processing")
     end
 
     it "returns reservation_missing for with_reservation flow when no redemption exists" do
@@ -74,6 +98,7 @@ RSpec.describe User::Redemptions::Validate do
       expect(result.halt?).to be(true)
       expect(result.success?).to be(false)
       expect(result.error_code).to eq("reservation_missing")
+      expect(result.error_message).to eq("Redemption reservation was not found")
     end
   end
 end

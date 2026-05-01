@@ -25,6 +25,7 @@ RSpec.describe "Api::V1::RewardsController", type: :request do
         create(:reward, title: "Coffee Voucher")
         create(:reward, title: "Movie Ticket")
         create(:reward, title: "Hidden Reward", is_available: false)
+        create(:reward, title: "Archived Reward", is_available: true, deleted_at: Time.current)
 
         get "/api/v1/rewards"
 

@@ -22,6 +22,7 @@ RSpec.describe RewardPolicy do
   describe "scope" do
     let!(:available_reward) { create(:reward, title: "A Reward", is_available: true) }
     let!(:unavailable_reward) { create(:reward, title: "B Reward", is_available: false) }
+    let!(:soft_deleted_reward) { create(:reward, title: "C Reward", is_available: true, deleted_at: Time.current) }
 
     context "when user is authenticated" do
       let(:user) { create(:user) }

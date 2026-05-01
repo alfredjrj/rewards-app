@@ -62,6 +62,10 @@ export function useRewardsPageState({ user, authLoading }: UseRewardsPageStateAr
     setRedemptionSuccesses((prev) => prev.filter((success) => success.id !== id));
   }
 
+  function dismissRedeemError() {
+    setRedeemError("");
+  }
+
   const pointsQuery = useQuery({
     queryKey: pointsQueryKey,
     queryFn: getUserPoints,
@@ -109,7 +113,7 @@ export function useRewardsPageState({ user, authLoading }: UseRewardsPageStateAr
   const rewards = rewardsQuery.rows;
   const totalPages = rewardsQuery.totalPages;
   const totalCount = rewardsQuery.totalCount;
-  const error = redeemError || rewardsQuery.error;
+  const error = rewardsQuery.error;
   const status = rewardsQuery.status;
   const isLoading = rewardsQuery.isLoading;
   const { goToFirstPage, onPreviousPage, onNextPage } = usePaginationControls({ setPage, totalPages });
@@ -264,6 +268,7 @@ export function useRewardsPageState({ user, authLoading }: UseRewardsPageStateAr
     status,
     isLoading,
     error,
+    redeemError,
     query,
     selectedRewardTypes,
     affordableOnly,
@@ -281,6 +286,7 @@ export function useRewardsPageState({ user, authLoading }: UseRewardsPageStateAr
     redemptionSuccesses,
     setPendingReward,
     dismissRedemptionSuccess,
+    dismissRedeemError,
     confirmRedeem,
     openRedeemModal,
     closeRedeemModal,

@@ -3,7 +3,7 @@ require "rails_helper"
 RSpec.describe Auditable::AuditContext do
   describe "#initialize" do
     it "normalizes origin and deep-stringifies metadata keys" do
-      context = described_class.new(
+      context = Auditable::AuditContext.new(
         origin: :api_request,
         metadata: { request_id: 1, nested: { flow: :sync } }
       )
@@ -18,7 +18,7 @@ RSpec.describe Auditable::AuditContext do
 
   describe "#with" do
     it "returns a new context with merged metadata" do
-      context = described_class.new(
+      context = Auditable::AuditContext.new(
         origin: "background_job",
         metadata: { "request_id" => "req-1", "nested" => { "existing" => true } }
       )

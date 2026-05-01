@@ -50,9 +50,24 @@ class Api::V1::User::RedemptionsController < AuthenticationController
     unless result.success?
       error_code = result.error&.dig(:code)
       error_status = RedemptionErrors.transient?(error_code) ? :service_unavailable : :unprocessable_entity
+      error_message = if RedemptionErrors.user_visible_code?(error_code)
+        result.error&.dig(:message)
+      elsif RedemptionErrors.sanitized_code?(error_code)
+        Rails.logger.error(
+          "[redemption.api] sanitized_error user_id=#{current_user.id} reward_id=#{@reward.id} " \
+          "request_id=#{@idempotency_key} code=#{error_code} details=#{result.error.inspect}"
+        )
+        RedemptionErrors::INTERNAL_ERROR_PUBLIC_MESSAGE
+      else
+        Rails.logger.error(
+          "[redemption.api] unknown_error user_id=#{current_user.id} reward_id=#{@reward.id} " \
+          "request_id=#{@idempotency_key} details=#{result.error.inspect}"
+        )
+        RedemptionErrors::INTERNAL_ERROR_PUBLIC_MESSAGE
+      end
       render_api_error(
         code: error_code || "redemption_failed",
-        message: result.error&.dig(:message) || "Unable to process redemption",
+        message: error_message || "Unable to process redemption",
         status: error_status,
         details: result.error&.dig(:details)
       )
